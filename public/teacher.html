@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎄</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>교사용 대시보드 · 크리스마스 점프 타워</title>
+  <link rel="stylesheet" href="/css/teacher.css">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="login" class="login hidden">
+    <form id="loginForm" class="card login-card">
+      <h1>🔒 교사용 대시보드</h1>
+      <input id="pw" type="password" inputmode="numeric" placeholder="비밀번호" autocomplete="current-password">
+      <button class="btn primary" type="submit">들어가기</button>
+      <div id="loginMsg" class="msg"></div>
+      <a class="small-link" href="/">🎮 학생 화면으로</a>
+    </form>
+  </section>
+
+  <!-- 대시보드 -->
+  <section id="dash" class="hidden">
+    <header>
+      <h1>🎄 크리스마스 점프 타워 <small>교사용</small></h1>
+      <div class="head-right">
+        <span id="conn" class="badge off">연결 중…</span>
+        <span class="url">학생 주소: <b id="studentUrl"></b></span>
+        <a class="btn" href="/" target="_blank">🎮 학생 화면 열기</a>
+        <button id="logoutBtn" class="btn ghost">로그아웃</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- 왼쪽: 게임 조작 -->
+      <section class="card col-ctrl">
+        <div id="phaseBadge" class="phase lobby">연습 시간(대기)</div>
+        <div id="bigTimer" class="big-timer">--:--</div>
+        <div class="online"><span id="onlineCount">0</span>명 참여 중</div>
+
+        <div class="row">
+          <label>게임 시간</label>
+          <input id="minInput" type="number" min="0" max="60" value="5"> 분
+          <input id="secInput" type="number" min="0" max="59" value="0"> 초
+        </div>
+        <div class="presets">
+          <button class="btn mini" data-min="3">3분</button><button class="btn mini" data-min="5">5분</button>
+          <button class="btn mini" data-min="7">7분</button><button class="btn mini" data-min="10">10분</button>
+        </div>
+        <button id="startBtn" class="btn primary big">▶ 게임 시작</button>
+        <div class="row2">
+          <button id="pauseBtn" class="btn">⏸ 일시정지</button>
+          <button id="plusBtn" class="btn">＋1분</button>
+          <button id="minusBtn" class="btn">－1분</button>
+        </div>
+        <div class="row2">
+          <button id="stopBtn" class="btn danger">⏹ 지금 끝내기</button>
+          <button id="lobbyBtn" class="btn">↺ 연습 시간으로</button>
+        </div>
+        <button id="csvBtn" class="btn ghost">📥 결과 CSV 내려받기</button>
+        <p class="tip">시작을 누르면 모든 학생 화면에 3·2·1 카운트다운 후 동시에 시작해요. 판마다 맵이 새로 만들어져요.</p>
+      </section>
+
+      <!-- 가운데: 타워 미니맵 -->
+      <section class="card col-map">
+        <h2>🗼 실시간 타워</h2>
+        <canvas id="map" width="300" height="640"></canvas>
+      </section>
+
+      <!-- 오른쪽: 순위 -->
+      <section class="card col-rank">
+        <h2>🏆 실시간 순위</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th></th><th>닉네임</th><th>점수</th><th>높이</th><th>정상</th><th>정답/오답</th></tr></thead>
+            <tbody id="rankBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- 문제은행 -->
+    <section class="card quizbank">
+      <h2>📚 문제은행 <span id="quizCount" class="badge">0문제</span> <span id="llmBadge" class="badge"></span></h2>
+      <div class="qb-grid">
+        <form id="uploadForm" class="upload">
+          <h3>📄 교사용 지도서 PDF → AI 문제 자동 생성</h3>
+          <label>PDF 파일 <input id="pdfFile" type="file" accept="application/pdf,.pdf" required></label>
+          <div class="row">
+            <label>쪽 범위 <input id="pages" placeholder="예: 210-236 (비우면 전체)"></label>
+            <label>문제 수 <input id="count" type="number" min="10" max="400" value="120"></label>
+          </div>
+          <div class="row">
+            <label>학년 <input id="grade" value="초등 6학년"></label>
+            <label>방식
+              <select id="mode"><option value="append">기존 문제에 추가</option><option value="replace">새 문제로 바꾸기</option></select>
+            </label>
+          </div>
+          <label>집중할 내용(선택) <input id="focus" placeholder="예: Lesson 11 Do you know anything about Tuho? 핵심 표현과 단어"></label>
+          <button id="uploadBtn" class="btn primary" type="submit">🤖 문제 만들기</button>
+          <div class="progress"><div id="progFill"></div></div>
+          <div id="jobMsg" class="msg"></div>
+          <p class="tip">만들어지는 대로 묶음마다 바로 게임에 들어가요(게임 중에도 OK). 지도서 전체보다 해당 단원 쪽 범위를 넣으면 더 정확하고 빨라요.</p>
+        </form>
+
+        <div class="bank">
+          <div class="bank-tools">
+            <input id="search" placeholder="🔎 문제 검색">
+            <button id="sampleBtn" class="btn mini">기본 문제로</button>
+            <button id="exportBtn" class="btn mini">JSON 저장</button>
+            <label class="btn mini file">JSON 불러오기<input id="importFile" type="file" accept=".json,application/json"></label>
+            <button id="clearBtn" class="btn mini danger">모두 지우기</button>
+          </div>
+          <div class="table-wrap bank-list">
+            <table>
+              <thead><tr><th>문제</th><th>정답</th><th>오답 보기</th><th></th></tr></thead>
+              <tbody id="bankBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/shared.js"></script>
+  <script src="/js/pixelart.js"></script>
+  <script src="/js/teacher.js"></script>
+</body>
+</html>

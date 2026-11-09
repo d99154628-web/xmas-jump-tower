@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎄</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>크리스마스 점프 타워 🎄</title>
+  <link rel="stylesheet" href="/css/game.css">
+</head>
+<body>
+  <!-- 입장 화면 -->
+  <section id="join" class="screen">
+    <div class="join-card">
+      <h1>🎄 크리스마스 점프 타워</h1>
+      <p class="sub">🌋 마그마 → 🌊 바닷속 → 🍂 땅 → ❄️ 하늘 → 🚀 우주! 영어 퀴즈를 풀며 꼭대기 트리까지 올라가요.</p>
+      <label class="field">닉네임 <input id="nameInput" maxlength="10" placeholder="예: 별빛햄찌" autocomplete="off"></label>
+      <div class="skin-title">캐릭터 고르기 <span id="skinLabel"></span></div>
+      <div id="skinGrid" class="skin-grid"></div>
+      <button id="joinBtn" class="big-btn">입장하기 ▶</button>
+      <div class="join-foot"><span id="joinCount">👥 0명 접속 중</span> · ⬅➡ 이동 · ⬆/Space 점프(공중에서 한 번 더!)</div>
+      <div id="joinMsg" class="msg"></div>
+    </div>
+  </section>
+
+  <!-- 게임 화면(16:9) -->
+  <section id="stage" class="hidden">
+    <div id="game"></div>
+    <div id="hud">
+      <div class="hud-left">
+        <div id="hudZone" class="pill">🌋 지구의 마그마</div>
+        <div id="hudHeight" class="pill small">0 m</div>
+      </div>
+      <div class="hud-center">
+        <div id="hudTimer" class="timer">--:--</div>
+        <div id="hudPhase" class="phase">연습 시간</div>
+      </div>
+      <div class="hud-right">
+        <div id="hudCount" class="pill">👥 0명</div>
+        <div id="hudScore" class="pill small">⭐ 0점</div>
+        <div class="energy"><span>⚡</span><div class="bar"><div id="energyFill"></div></div></div>
+      </div>
+      <div id="toast" class="toast"></div>
+      <div id="center" class="center-msg hidden"></div>
+    </div>
+
+    <div id="quiz" class="quiz hidden">
+      <div class="quiz-card">
+        <div id="quizTag" class="quiz-tag">🎁 English Quiz</div>
+        <div id="quizQ" class="quiz-q">…</div>
+        <div id="quizChoices" class="quiz-choices"></div>
+        <div id="quizHint" class="quiz-hint"></div>
+        <div id="quizFeedback" class="quiz-feedback"></div>
+      </div>
+    </div>
+
+    <div id="result" class="result hidden">
+      <div class="result-card">
+        <h2>🏁 게임 끝!</h2>
+        <div id="myRank" class="my-rank"></div>
+        <ol id="rankList" class="rank-list"></ol>
+        <p class="sub">선생님이 다음 판을 시작할 때까지 기다려 주세요.</p>
+      </div>
+    </div>
+
+    <div class="corner">
+      <button id="muteBtn" title="음악 켜기/끄기 (M)">🔊</button>
+    </div>
+  </section>
+
+  <button id="teacherBtn" class="teacher-link">🔒 교사용</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/phaser.min.js"></script>
+  <script src="/js/shared.js"></script>
+  <script src="/js/pixelart.js"></script>
+  <script src="/js/audio.js"></script>
+  <script src="/js/game.js"></script>
+</body>
+</html>
