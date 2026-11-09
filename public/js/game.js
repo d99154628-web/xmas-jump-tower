@@ -188,9 +188,12 @@
     if (e.target && e.target.tagName === 'INPUT') return;
     if (!$('quiz').classList.contains('hidden') && /^[1-4]$/.test(e.key)) Quiz.pick(Number(e.key) - 1);
     if (e.key === 'm' || e.key === 'M') toggleMute();
+    if (e.key === 'n' || e.key === 'N') AUDIO.skip();
   });
   function toggleMute() { $('muteBtn').textContent = AUDIO.toggleMusic() ? '🔊' : '🔇'; }
   $('muteBtn').onclick = toggleMute;
+  $('skipBtn').onclick = () => AUDIO.skip();
+  AUDIO.onSong = (name) => { if (!$('stage').classList.contains('hidden')) toast(`🎵 ${name}`, 2200); };
 
   function showResult(ranking) {
     Net.state = { ...Net.state, phase: 'ended' };
