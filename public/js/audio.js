@@ -107,6 +107,8 @@
     summit: (t) => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(sfxBus, 'square', f, t + i * 0.1, 0.18, 0.12)),
     beep: (t) => tone(sfxBus, 'square', 880, t, 0.12, 0.12),
     go: (t) => tone(sfxBus, 'square', 1320, t, 0.35, 0.14),
+    boing: (t) => { tone(sfxBus, 'triangle', 180, t, 0.35, 0.3, 720); tone(sfxBus, 'square', 360, t + 0.02, 0.18, 0.06, 1100); },
+    land: (t) => noise(sfxBus, t, 0.08, 0.15, 'lowpass', 900),
     pop: (t) => tone(sfxBus, 'triangle', 660, t, 0.08, 0.15, 990),
   };
 

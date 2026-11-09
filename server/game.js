@@ -129,7 +129,7 @@ function onMove(socket, arr) {
   const now = Date.now();
   const dt = Math.min(1000, Math.max(16, now - (rec.lastMoveAt || now)));
   // 위로는 물리적으로 가능한 속도까지만(간단한 치트 방지). 아래(추락·리스폰)는 자유.
-  const maxRise = 1000 * dt / 1000 + 80;
+  const maxRise = 1250 * dt / 1000 + 80;   // 스프링(1080px/s) 포함
   if (rec.y - y > maxRise) y = rec.y - maxRise;
   rec.x = x; rec.y = y; rec.anim = (arr[2] | 0) & 3; rec.flip = arr[3] ? 1 : 0; rec.lastMoveAt = now;
   if (isRunning()) {

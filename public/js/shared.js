@@ -20,7 +20,7 @@
   const WORLD_H = ZONE_H * ZONES.length;
   const FLOOR_Y = WORLD_H - 32;  // 맨 아래 바닥의 윗면 y
 
-  const PHYS = { gravity: 1300, speed: 250, jump: 640, djump: 580 };
+  const PHYS = { gravity: 1300, speed: 250, jump: 640, djump: 580, spring: 1080 };
   const NET = { tickHz: 20, sendHz: 15, interpDelay: 120 };
   const SKIN_COUNT = 30;
   const GAME = {
@@ -55,6 +55,8 @@
     const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
     const platforms = [];
     const gifts = [];
+    const springs = [];
+    const rnd2 = mulberry32((seed ^ 0x9e3779b9) >>> 0);   // 스프링은 따로(발판 배치에 영향 없음)
     const checkpoints = [{ x: WORLD_W / 2, y: FLOOR_Y }];
 
     platforms.push({ x: 0, y: FLOOR_Y, w: WORLD_W, zone: 0, kind: 'floor' });
@@ -88,6 +90,7 @@
       const main = { x: Math.round(cx - w / 2), y: Math.round(y), w, zone, kind: 'main' };
       platforms.push(main);
       if (row % 6 === 0) gifts.push({ id: gid++, x: Math.round(cx), y: Math.round(y) - 16 });
+      if (row % 7 === 3 && w >= 96) springs.push({ x: Math.round(rnd2() < 0.5 ? main.x + 16 : main.x + w - 16), y: main.y });
 
       // 갈림길(보조 발판)
       if (rnd() < 0.45) {
@@ -95,7 +98,9 @@
         let cx2 = r(w2 / 2 + 8, WORLD_W - w2 / 2 - 8);
         if (Math.abs(cx2 - cx) < 220) cx2 = cx2 < cx ? Math.max(w2 / 2 + 8, cx - 260) : Math.min(WORLD_W - w2 / 2 - 8, cx + 260);
         if (Math.abs(cx2 - cx) > w / 2 + w2 / 2 + 20) {
-          platforms.push({ x: Math.round(cx2 - w2 / 2), y: Math.round(y + r(-20, 20)), w: w2, zone, kind: 'side' });
+          const side = { x: Math.round(cx2 - w2 / 2), y: Math.round(y + r(-20, 20)), w: w2, zone, kind: 'side' };
+          platforms.push(side);
+          if (rnd2() < 0.22) springs.push({ x: side.x + Math.round(w2 / 2), y: side.y });
         }
       }
       prevCx = cx;
@@ -106,7 +111,7 @@
     const sw = 320;
     const scx = clamp(prevCx, sw / 2 + 16, WORLD_W - sw / 2 - 16);
     platforms.push({ x: Math.round(scx - sw / 2), y: sy, w: sw, zone: ZONES.length - 1, kind: 'summit' });
-    return { seed, platforms, gifts, checkpoints, summit: { x: Math.round(scx), y: sy } };
+    return { seed, platforms, gifts, springs, checkpoints, summit: { x: Math.round(scx), y: sy } };
   }
 
   return { WORLD_W, WORLD_H, ZONE_H, ZONES, FLOOR_Y, PHYS, NET, SKIN_COUNT, GAME,

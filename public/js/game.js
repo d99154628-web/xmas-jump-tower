@@ -11,7 +11,7 @@
   'use strict';
   const S = SHARED;
   const $ = (id) => document.getElementById(id);
-  const ANIMS = ['_idle', '_run', '_jump'];
+  const ANIMS = ['_idle', '_run', '_jump', '_fall'];
   const LABEL = { fontFamily: 'Galmuri11, "Malgun Gothic", sans-serif', fontSize: '13px', color: '#ffffff', stroke: '#000000', strokeThickness: 3, resolution: 2, padding: { x: 2, y: 3 } };
 
   /* ================= 네트워크 ================= */
@@ -229,7 +229,8 @@
     [{ tex: 'p_leaf', o: { x: { min: 0, max: 1000 }, y: -10, speedY: { min: 40, max: 80 }, speedX: { min: -45, max: 10 }, lifespan: 9000, scale: { min: 2, max: 3 }, rotate: { start: 0, end: 360 }, frequency: 170 } }],
     [{ tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 35, max: 80 }, speedX: { min: -20, max: 20 }, lifespan: 9000, scale: { min: 1.5, max: 3 }, frequency: 45 } }],
     [{ tex: 'p_star', o: { x: { min: 0, max: 960 }, y: { min: 0, max: 540 }, speed: 0, lifespan: 1600, scale: { start: 2.5, end: 0 }, tint: [0xffffff, 0xfff6a8, 0xff8080, 0x80ff9a], frequency: 110 } },
-     { tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 20, max: 40 }, lifespan: 15000, scale: 2, alpha: 0.6, frequency: 300 } }],
+     { tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 20, max: 40 }, lifespan: 15000, scale: 2, alpha: 0.6, frequency: 300 } },
+     { tex: 'p_shoot', o: { x: { min: 300, max: 1000 }, y: { min: -10, max: 160 }, speedX: -520, speedY: 260, rotate: 153, lifespan: 1100, scale: 2, alpha: { start: 1, end: 0 }, frequency: 1700 } }],
   ];
 
   class GameScene extends Phaser.Scene {
@@ -247,15 +248,17 @@
       this.physics.world.setBounds(0, 0, S.WORLD_W, S.WORLD_H);
       const cam = this.cameras.main;
       cam.setBounds(0, 0, S.WORLD_W, S.WORLD_H).setRoundPixels(true);
-      for (let z = 0; z < S.ZONES.length; z++) this.add.image(0, S.zoneTop(z), 'bg' + z).setOrigin(0).setScale(4).setDepth(-10);
+      for (let z = 0; z < S.ZONES.length; z++) this.add.image(0, S.zoneTop(z), 'bg' + z).setOrigin(0).setScale(PIXEL.BG_SCALE).setDepth(-10);
+      this.addAmbient();
 
       this.platforms = this.physics.add.staticGroup();
       this.gifts = this.physics.add.staticGroup();
+      this.springs = this.physics.add.staticGroup();
       this.decor = [];
 
       this.skinKey = PIXEL.ensureSkin(this, profile.skin);
-      this.player = this.physics.add.sprite(Net.me.x, Net.me.y, this.skinKey, 0).setScale(3).setDepth(10);
-      this.player.body.setSize(12, 16).setOffset(2, 4);
+      this.player = this.physics.add.sprite(Net.me.x, Net.me.y, this.skinKey, 0).setScale(2).setDepth(10);
+      this.player.body.setSize(14, 20).setOffset(5, 8);
       this.player.setCollideWorldBounds(true).setMaxVelocity(600, 950);
       this.player.play(this.skinKey + '_idle');
       this.myLabel = this.label(0, 0, profile.name, { ...LABEL, color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(12);
@@ -263,6 +266,7 @@
       this.buildLevel(Net.state.seed);
       this.physics.add.collider(this.player, this.platforms);
       this.physics.add.overlap(this.player, this.gifts, (_p, g) => this.onGift(g));
+      this.physics.add.overlap(this.player, this.springs, (_p, sp) => this.onSpring(sp));
       cam.startFollow(this.player, true, 1, 0.14, 0, 70);
 
       const kb = this.input.keyboard;
@@ -273,6 +277,7 @@
         return e;
       }));
       this.puff = this.add.particles(0, 0, 'p_puff', { speed: { min: 40, max: 130 }, angle: { min: 30, max: 150 }, lifespan: 380, scale: { start: 3, end: 0 }, emitting: false }).setDepth(9);
+      this.dust = this.add.particles(0, 0, 'p_dust', { speed: { min: 20, max: 70 }, angle: { min: 180, max: 360 }, lifespan: 300, scale: { start: 2, end: 0 }, gravityY: 200, emitting: false }).setDepth(9);
       this.conf = this.add.particles(0, 0, 'p_conf', { speed: { min: 200, max: 480 }, angle: { min: 220, max: 320 }, gravityY: 700, lifespan: 2200, scale: 3,
         tint: [0xff3b3b, 0xffd23f, 0x4dff88, 0x4dc3ff, 0xff7bd5], emitting: false }).setDepth(20);
 
@@ -294,24 +299,32 @@
       this.decor = [];
       this.platforms.clear(true, true);
       this.gifts.clear(true, true);
+      this.springs.clear(true, true);
       if (this.summitOverlap) { this.summitOverlap.destroy(); this.summitZone.destroy(); }
 
-      for (const p of this.level.platforms) {
-        const s = this.platforms.create(p.x + p.w / 2, p.y + 8, PIXEL.ensurePlatform(this, p.zone, p.w));
+      this.level.platforms.forEach((p, i) => {
+        // 텍스처는 위 8px 장식 + 아래 16px 발판. 충돌은 발판 부분만
+        const s = this.platforms.create(p.x + p.w / 2, p.y - PIXEL.SURF + PIXEL.PLAT_H / 2, PIXEL.ensurePlatform(this, p.zone, p.w, i % 3));
+        s.body.setSize(p.w, PIXEL.PLAT_H - PIXEL.SURF, false);
+        s.body.setOffset(0, PIXEL.SURF);
         const c = s.body.checkCollision;
         c.down = false; c.left = false; c.right = false;   // 아래에서 뚫고 올라가는 발판
         if (p.kind === 'checkpoint') {
           const z = S.ZONES[p.zone];
-          this.decor.push(this.label(p.x + p.w / 2, p.y - 6, `${z.emoji} ${z.name} · ${z.season}`, { ...LABEL, fontSize: '15px', color: '#fff6a8' }).setOrigin(0.5, 1).setDepth(3));
+          this.decor.push(this.label(p.x + p.w / 2, p.y - 78, `${z.emoji} ${z.name} · ${z.season}`, { ...LABEL, fontSize: '15px', color: '#fff6a8' }).setOrigin(0.5, 1).setDepth(3));
         }
+      });
+      for (const sp of this.level.springs) {
+        const s = this.springs.create(sp.x, sp.y - 14, 'spring', 0).setScale(2).refreshBody();
+        s.setDepth(4);
       }
       for (const g of this.level.gifts) {
-        const s = this.gifts.create(g.x, g.y - 4, 'gift').setScale(2.5).refreshBody();
+        const s = this.gifts.create(g.x, g.y - 6, 'gift').setScale(2).refreshBody();
         s.setDepth(4);
         this.decor.push(this.tweens.add({ targets: s, y: s.y - 4, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' }));
       }
       const sm = this.level.summit;
-      this.decor.push(this.add.image(sm.x, sm.y, 'tree').setOrigin(0.5, 1).setScale(3).setDepth(3));
+      this.decor.push(this.add.image(sm.x, sm.y, 'tree').setOrigin(0.5, 1).setScale(2).setDepth(3));
       this.decor.push(this.label(sm.x, sm.y - 110, '🎄 GOAL!', { ...LABEL, fontSize: '18px', color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(3));
       this.summitZone = this.add.zone(sm.x, sm.y - 45, 170, 90);
       this.physics.add.existing(this.summitZone, true);
@@ -322,8 +335,8 @@
       if (r.sprite) return;
       const key = PIXEL.ensureSkin(this, r.skin);
       const b = r.buf[r.buf.length - 1];
-      r.sprite = this.add.sprite(b.x, b.y, key, 0).setScale(3).setDepth(5);
-      r.label = this.label(b.x, b.y - 34, r.name, LABEL).setOrigin(0.5, 1).setDepth(6);
+      r.sprite = this.add.sprite(b.x, b.y, key, 0).setScale(2).setDepth(5);
+      r.label = this.label(b.x, b.y - 32, r.name, LABEL).setOrigin(0.5, 1).setDepth(6);
       r.key = key;
     }
 
@@ -342,6 +355,7 @@
     }
 
     teleport(x, y) {
+      if (this.fx) { this.fx.forEach((list) => list.forEach((e) => { e.stop(); e.killAll(); })); this.zone = -1; }   // 다른 구역 눈·낙엽이 남지 않게
       this.player.setPosition(x, y);
       this.player.body.setVelocity(0, 0);
       this.lastGroundY = y; this.whooshed = false; this.safeZone = S.zoneOf(y);
@@ -369,6 +383,8 @@
       const k = this.keys;
       const onGround = body.blocked.down || body.touching.down;
 
+      if (onGround && !this.wasGround && this.prevVy > 380) { this.dust.explode(6, p.x, p.y + 28); if (this.prevVy > 700) AUDIO.sfx('land'); }
+      this.wasGround = onGround; this.prevVy = body.velocity.y;
       if (onGround) { this.coyote = time; this.jumps = 0; this.lastGroundY = p.y; this.safeZone = S.zoneOf(p.y); this.whooshed = false; }
 
       if (frozen) {
@@ -385,7 +401,7 @@
           } else if (this.jumps < 2 && !onGround) {
             if (this.energy > 0 || !running) {
               body.setVelocityY(-S.PHYS.djump); this.jumps = 2; this.jumpBuf = -1e9; AUDIO.sfx('djump');
-              this.puff.explode(8, p.x, p.y + 26);
+              this.puff.explode(8, p.x, p.y + 24);
             } else if (!this.noEnergyAt || time - this.noEnergyAt > 2500) {
               this.noEnergyAt = time; this.jumpBuf = -1e9;
               toast('⚡ 에너지가 없어요! 퀴즈를 맞히면 더블점프 충전');
@@ -411,10 +427,10 @@
         if (!this.quizOpen && time - this.lastQuizAt > S.GAME.quizEvery * 1000) this.openQuiz('time');
       }
 
-      const anim = !onGround ? 2 : Math.abs(body.velocity.x) > 10 ? 1 : 0;
+      const anim = !onGround ? (body.velocity.y < 0 ? 2 : 3) : Math.abs(body.velocity.x) > 10 ? 1 : 0;
       if (anim !== this.anim) { this.anim = anim; p.play(this.skinKey + ANIMS[anim]); }
       if (body.velocity.x < 0) p.setFlipX(true); else if (body.velocity.x > 0) p.setFlipX(false);
-      this.myLabel.setPosition(p.x, p.y - 34);
+      this.myLabel.setPosition(p.x, p.y - 32);
 
       this.sendPosition(time, anim);
       this.renderRemotes(sNow);
@@ -450,7 +466,7 @@
         r.sprite.setVisible(vis); r.label.setVisible(vis);
         if (!vis) continue;
         r.sprite.setPosition(s.x, s.y);
-        r.label.setPosition(s.x, s.y - 34);
+        r.label.setPosition(s.x, s.y - 32);
         if (s.anim !== r.curAnim) { r.curAnim = s.anim; r.sprite.play(r.key + (ANIMS[s.anim] || '_idle')); }
         r.sprite.setFlipX(!!s.flip);
       }
@@ -496,6 +512,39 @@
         setTimeout(() => center(null), 700);
       } else if (st.phase === 'playing' && st.paused) center('⏸ 일시정지', true);
       else if (!$('center').classList.contains('hidden') && $('center').textContent === '⏸ 일시정지') center(null);
+    }
+
+    /* ---------- 스프링·배경 소품 ---------- */
+    onSpring(sp) {
+      const body = this.player.body;
+      if (this.quizOpen || this.respawning || body.velocity.y < -60 || this.time.now - (sp.lastBoing || 0) < 250) return;
+      sp.lastBoing = this.time.now;
+      body.setVelocityY(-S.PHYS.spring);
+      this.jumps = 1; this.coyote = -1e9; this.whooshed = false;
+      sp.setFrame(1);
+      this.tweens.add({ targets: sp, scaleX: 2.3, scaleY: 1.7, duration: 70, yoyo: true, onComplete: () => { sp.setFrame(0); sp.setScale(2); } });
+      this.puff.explode(10, sp.x, sp.y - 6);
+      AUDIO.sfx('boing');
+    }
+
+    addAmbient() {
+      const rnd = S.mulberry32(4242);
+      const zoneY = (z, a, b) => S.zoneTop(z) + S.ZONE_H * (a + rnd() * (b - a));
+      const swim = (obj, dist, dur) => this.tweens.add({ targets: obj, x: obj.x + dist, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+        onYoyo: () => obj.toggleFlipX(), onRepeat: () => obj.toggleFlipX() });
+      for (let i = 0; i < 10; i++) {           // 물고기
+        const f = this.add.image(60 + rnd() * 400, zoneY(1, 0.08, 0.9), 'fish' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.9);
+        swim(f, 300 + rnd() * 300, 7000 + rnd() * 7000);
+        this.tweens.add({ targets: f, y: f.y + 10, duration: 1400 + rnd() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      }
+      for (let i = 0; i < 6; i++) {            // 새
+        const b = this.add.sprite(40 + rnd() * 300, zoneY(2, 0.08, 0.6), 'bird').setScale(2).setDepth(-9).play('bird_fly');
+        swim(b, 400 + rnd() * 200, 9000 + rnd() * 6000);
+      }
+      for (let i = 0; i < 9; i++) {            // 떠다니는 구름
+        const c = this.add.image(rnd() * 960, zoneY(3, 0.05, 0.85), 'cloud' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.85);
+        swim(c, 160 + rnd() * 200, 18000 + rnd() * 14000);
+      }
     }
 
     /* ---------- 퀴즈·선물·정상 ---------- */

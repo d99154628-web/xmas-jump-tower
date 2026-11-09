@@ -165,6 +165,8 @@
       g.fillStyle = p.kind === 'checkpoint' || p.kind === 'summit' ? '#ffd23f' : '#ffffff88';
       g.fillRect(p.x * sx, p.y * sy, Math.max(2, p.w * sx), 2);
     }
+    g.fillStyle = '#4dff88';
+    for (const sp of lvl.springs) g.fillRect(sp.x * sx - 1, sp.y * sy - 3, 3, 3);
     g.fillStyle = '#e23a3a';
     for (const gf of lvl.gifts) g.fillRect(gf.x * sx - 1, gf.y * sy - 2, 3, 3);
     g.font = '16px sans-serif'; g.fillText('🎄', lvl.summit.x * sx - 8, lvl.summit.y * sy);
@@ -182,7 +184,7 @@
     for (const p of players) {
       if (!p.online) continue;
       const x = p.x * sx, y = p.y * sy;
-      g.drawImage(PIXEL.charSheet(p.skin), 0, 0, PIXEL.FW, PIXEL.FH, x - 8, y - 18, 16, 20);
+      g.drawImage(PIXEL.charSheet(p.skin), 0, 0, PIXEL.FW, PIXEL.FH, x - 9, y - 19, 18, 21);
       g.fillStyle = '#000a'; g.fillText(p.name, x + 1, y - 19);
       g.fillStyle = '#fff'; g.fillText(p.name, x, y - 20);
     }
