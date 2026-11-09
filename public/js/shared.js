@@ -10,14 +10,23 @@
 
   const WORLD_W = 960;          // 16:9 화면(960x540) 가로 폭 = 맵 폭
   const ZONE_H = 1800;          // 구역 하나의 높이(px)
-  const ZONES = [
-    { key: 'magma',  name: '지구의 마그마', emoji: '🌋', season: '불씨',       color: '#ff5a1f' },
-    { key: 'water',  name: '바닷속',        emoji: '🌊', season: '봄',         color: '#2bb3ff' },
-    { key: 'ground', name: '땅 위',          emoji: '🍂', season: '가을',       color: '#f0a020' },
-    { key: 'sky',    name: '하늘',          emoji: '❄️', season: '겨울',       color: '#bfe4ff' },
-    { key: 'space',  name: '우주',          emoji: '🎄', season: '크리스마스', color: '#b388ff' },
-  ];
-  const WORLD_H = ZONE_H * ZONES.length;
+  // 테마(구역) 10개. 판마다 순서를 섞고, 맨 위는 언제나 산타 마을(크리스마스 트리 골인)
+  const THEMES = {
+    magma:  { name: '용암 동굴',     emoji: '🌋', season: '부글부글 불씨',   color: '#c2410c' },
+    water:  { name: '바닷속 왕국',   emoji: '🌊', season: '봄 산호',         color: '#1c6fb3' },
+    flower: { name: '꽃나라',         emoji: '🌸', season: '봄바람 꽃잎',     color: '#f7a1c4' },
+    ground: { name: '단풍 마을',     emoji: '🍂', season: '가을',            color: '#d9822b' },
+    candy:  { name: '과자나라',       emoji: '🍭', season: '달콤 스프링클',   color: '#ff8fc8' },
+    oz:     { name: '오즈의 마법사', emoji: '🌈', season: '노란 벽돌길',     color: '#2fbf71' },
+    sky:    { name: '겨울 하늘',     emoji: '❄️', season: '눈송이',          color: '#4a86d4' },
+    star:   { name: '별나라',         emoji: '⭐', season: '반짝반짝',        color: '#6b4fc0' },
+    space:  { name: '우주',           emoji: '🚀', season: '별똥별',          color: '#12124a' },
+    xmas:   { name: '산타 마을',     emoji: '🎅', season: '메리 크리스마스', color: '#e23a3a' },
+  };
+  const THEME_KEYS = Object.keys(THEMES);
+  const ZONE_COUNT = THEME_KEYS.length;
+  const WORLD_H = ZONE_H * ZONE_COUNT;
+  const ZONES = THEME_KEYS.map((k) => ({ key: k, ...THEMES[k] }));   // (기본 순서)
   const FLOOR_Y = WORLD_H - 32;  // 맨 아래 바닥의 윗면 y
 
   const PHYS = { gravity: 1300, speed: 250, jump: 640, djump: 580, spring: 1080 };
@@ -42,12 +51,21 @@
   }
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  function zoneOf(y) { return clamp(Math.floor((WORLD_H - y) / ZONE_H), 0, ZONES.length - 1); }
+  function zoneOf(y) { return clamp(Math.floor((WORLD_H - y) / ZONE_H), 0, ZONE_COUNT - 1); }
+  // 판(seed)마다 테마 순서를 섞는다. 산타 마을은 항상 꼭대기
+  function zoneOrder(seed) {
+    const rnd = mulberry32((seed ^ 0x51ed270b) >>> 0);
+    const keys = THEME_KEYS.filter((k) => k !== 'xmas');
+    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+    return keys.concat('xmas');
+  }
   function heightOf(y) { return Math.max(0, Math.round((FLOOR_Y - 30 - y) / 10)); } // 1m = 10px
   function zoneTop(z) { return WORLD_H - (z + 1) * ZONE_H; }
 
   // 구역이 높아질수록 발판이 좁아지고 간격이 넓어진다(난이도 상승)
-  const WIDTHS = [[128, 128, 96], [128, 96, 96], [96, 128, 64], [96, 64, 64], [64, 96, 64]];
+  const WIDTHS = [[128, 128, 96], [128, 96, 96], [96, 96, 128, 64], [96, 64, 64], [64, 96, 64]];
+  const diffOf = (z) => z / (ZONE_COUNT - 1);
+  const widthsOf = (z) => WIDTHS[Math.min(4, Math.floor(diffOf(z) * 5))];
 
   function buildLevel(seed) {
     const rnd = mulberry32(seed >>> 0);
@@ -68,7 +86,7 @@
 
     while (true) {
       const z = zoneOf(y);
-      const gap = r(92 + z * 5, 116 + z * 5);
+      const gap = r(92 + diffOf(z) * 22, 116 + diffOf(z) * 22);
       if (y - gap < 300) break;
       y -= gap;
       row++;
@@ -85,7 +103,7 @@
         continue;
       }
 
-      const w = pick(WIDTHS[zone]);
+      const w = pick(widthsOf(zone));
       const cx = clamp(prevCx + r(-200, 200), w / 2 + 8, WORLD_W - w / 2 - 8);
       const main = { x: Math.round(cx - w / 2), y: Math.round(y), w, zone, kind: 'main' };
       platforms.push(main);
@@ -110,10 +128,10 @@
     const sy = Math.round(y - 105);
     const sw = 320;
     const scx = clamp(prevCx, sw / 2 + 16, WORLD_W - sw / 2 - 16);
-    platforms.push({ x: Math.round(scx - sw / 2), y: sy, w: sw, zone: ZONES.length - 1, kind: 'summit' });
-    return { seed, platforms, gifts, springs, checkpoints, summit: { x: Math.round(scx), y: sy } };
+    platforms.push({ x: Math.round(scx - sw / 2), y: sy, w: sw, zone: ZONE_COUNT - 1, kind: 'summit' });
+    return { seed, order: zoneOrder(seed), platforms, gifts, springs, checkpoints, summit: { x: Math.round(scx), y: sy } };
   }
 
-  return { WORLD_W, WORLD_H, ZONE_H, ZONES, FLOOR_Y, PHYS, NET, SKIN_COUNT, GAME,
+  return { WORLD_W, WORLD_H, ZONE_H, ZONES, THEMES, THEME_KEYS, ZONE_COUNT, zoneOrder, FLOOR_Y, PHYS, NET, SKIN_COUNT, GAME,
     mulberry32, clamp, zoneOf, heightOf, zoneTop, buildLevel };
 });

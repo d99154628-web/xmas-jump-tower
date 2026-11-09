@@ -52,8 +52,6 @@
       $('login').classList.add('hidden');
       $('dash').classList.remove('hidden');
       state = s.state;
-      $('llmBadge').textContent = s.llm ? `🤖 AI 사용 가능 (${s.model})` : '⚠️ OPENAI_API_KEY 없음 — PDF 생성 불가';
-      $('llmBadge').className = 'badge ' + (s.llm ? 'on' : 'warn');
       connectSocket();
       loadBank();
     } catch (e) { if (e.message !== 'unauthorized') alert(e.message); }
@@ -69,7 +67,6 @@
     socket.on('state', (s) => { state = s; renderPhase(); $('quizCount').textContent = `${s.quizCount}문제`; if (bank.length !== s.quizCount) loadBankSoon(); });
     socket.on('dash', (d) => { players = d.players; renderRanking(); drawMap(); });
     socket.on('game:end', () => { renderPhase(); });
-    socket.on('quiz:job', (job) => renderJob(job));
   }
   function setConn(on) { const c = $('conn'); c.textContent = on ? '● 실시간 연결됨' : '● 연결 끊김'; c.className = 'badge ' + (on ? 'on' : 'off'); }
 
@@ -147,20 +144,21 @@
   tickTimer.n = 0;
 
   /* ---------- 미니맵 · 순위 ---------- */
-  const ZONE_BG = ['#5c1408', '#155fa0', '#6cb8ef', '#5b86cf', '#0b0b2e'];
   function buildMapBase(seed) {
     const cv = $('map');
     const W = cv.width, H = cv.height;
     const base = document.createElement('canvas'); base.width = W; base.height = H;
     const g = base.getContext('2d');
     const sx = W / S.WORLD_W, sy = H / S.WORLD_H;
-    S.ZONES.forEach((z, i) => {
-      g.fillStyle = ZONE_BG[i];
+    const lvl = S.buildLevel(seed);
+    lvl.order.forEach((key, i) => {
+      const z = S.THEMES[key];
+      g.fillStyle = z.color;
       g.fillRect(0, S.zoneTop(i) * sy, W, S.ZONE_H * sy + 1);
-      g.fillStyle = '#ffffffcc'; g.font = '12px Galmuri11, sans-serif';
+      g.fillStyle = '#0006'; g.fillRect(0, S.zoneTop(i) * sy, W, S.ZONE_H * sy + 1);
+      g.fillStyle = '#ffffffdd'; g.font = '12px Galmuri11, sans-serif';
       g.fillText(`${z.emoji} ${z.name}`, 6, (S.zoneTop(i) + S.ZONE_H) * sy - 6);
     });
-    const lvl = S.buildLevel(seed);
     for (const p of lvl.platforms) {
       g.fillStyle = p.kind === 'checkpoint' || p.kind === 'summit' ? '#ffd23f' : '#ffffff88';
       g.fillRect(p.x * sx, p.y * sy, Math.max(2, p.w * sx), 2);
@@ -243,7 +241,7 @@
     $('bankBody').replaceChildren(frag);
   }
   $('search').oninput = renderBank;
-  $('sampleBtn').onclick = run(async () => { if (confirm('지금 문제를 지우고 기본 문제로 바꿀까요?')) { await post('/quiz/sample'); loadBank(); } });
+  $('sampleBtn').onclick = run(async () => { if (confirm('지금 문제를 지우고 교과서 문제(7~10과)로 되돌릴까요?')) { await post('/quiz/sample'); loadBank(); } });
   $('clearBtn').onclick = run(async () => { if (confirm('문제를 모두 지울까요? (게임 중이면 퀴즈가 안 나와요)')) { await api('/quiz', { method: 'DELETE' }); loadBank(); } });
   $('exportBtn').onclick = () => {
     const a = document.createElement('a');
@@ -262,34 +260,6 @@
     $('importFile').value = '';
     loadBank();
   });
-
-  /* ---------- PDF 업로드 → AI 생성 ---------- */
-  let pollTimer = null;
-  $('uploadForm').onsubmit = run(async (e) => {
-    e.preventDefault();
-    const file = $('pdfFile').files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('pdf', file);
-    ['pages', 'count', 'grade', 'focus', 'mode'].forEach((id) => fd.append(id, $(id).value));
-    $('uploadBtn').disabled = true;
-    renderJob({ status: 'uploading', progress: 2, message: `${file.name} 올리는 중…` });
-    try {
-      const r = await api('/quiz/upload', { method: 'POST', body: fd });
-      clearInterval(pollTimer);
-      pollTimer = setInterval(async () => {          // 소켓이 끊겨도 진행 상황을 받도록 폴링 병행
-        try { const j = await api('/quiz/job/' + r.jobId); renderJob(j.job); } catch { /* ignore */ }
-      }, 2500);
-    } catch (err) {
-      $('uploadBtn').disabled = false;
-      renderJob({ status: 'error', progress: 0, message: err.message });
-    }
-  });
-  function renderJob(job) {
-    $('progFill').style.width = `${job.progress || 0}%`;
-    $('jobMsg').textContent = (job.status === 'error' ? '❌ ' : job.status === 'done' ? '✅ ' : '⏳ ') + job.message;
-    if (job.status === 'done' || job.status === 'error') { clearInterval(pollTimer); $('uploadBtn').disabled = false; loadBankSoon(); }
-  }
 
   if (token) boot(); else showLogin();
   requestAnimationFrame(tickTimer);

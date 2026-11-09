@@ -222,16 +222,23 @@
   };
 
   /* ================= 게임 씬 ================= */
-  const FX = [
-    [{ tex: 'p_ember', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -90, max: -30 }, speedX: { min: -15, max: 15 }, lifespan: 6500, scale: { min: 2, max: 3 }, alpha: { start: 1, end: 0 }, frequency: 90 } }],
-    [{ tex: 'p_bubble', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -70, max: -25 }, speedX: { min: -8, max: 8 }, lifespan: 9000, scale: { min: 2, max: 3 }, frequency: 160 } },
-     { tex: 'p_petal', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 15, max: 35 }, speedX: { min: -25, max: 25 }, lifespan: 16000, scale: 3, rotate: { min: 0, max: 360 }, frequency: 420 } }],
-    [{ tex: 'p_leaf', o: { x: { min: 0, max: 1000 }, y: -10, speedY: { min: 40, max: 80 }, speedX: { min: -45, max: 10 }, lifespan: 9000, scale: { min: 2, max: 3 }, rotate: { start: 0, end: 360 }, frequency: 170 } }],
-    [{ tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 35, max: 80 }, speedX: { min: -20, max: 20 }, lifespan: 9000, scale: { min: 1.5, max: 3 }, frequency: 45 } }],
-    [{ tex: 'p_star', o: { x: { min: 0, max: 960 }, y: { min: 0, max: 540 }, speed: 0, lifespan: 1600, scale: { start: 2.5, end: 0 }, tint: [0xffffff, 0xfff6a8, 0xff8080, 0x80ff9a], frequency: 110 } },
-     { tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 20, max: 40 }, lifespan: 15000, scale: 2, alpha: 0.6, frequency: 300 } },
-     { tex: 'p_shoot', o: { x: { min: 300, max: 1000 }, y: { min: -10, max: 160 }, speedX: -520, speedY: 260, rotate: 153, lifespan: 1100, scale: 2, alpha: { start: 1, end: 0 }, frequency: 1700 } }],
-  ];
+  const SNOW = { tex: 'p_snow', o: { x: { min: 0, max: 960 }, y: -10, speedY: { min: 35, max: 80 }, speedX: { min: -20, max: 20 }, lifespan: 9000, scale: { min: 1.5, max: 3 }, frequency: 45 } };
+  const TWINKLE = (tints, freq) => ({ tex: 'p_star', o: { x: { min: 0, max: 960 }, y: { min: 0, max: 540 }, speed: 0, lifespan: 1600, scale: { start: 2.5, end: 0 }, tint: tints, frequency: freq } });
+  const SHOOT = { tex: 'p_shoot', o: { x: { min: 300, max: 1000 }, y: { min: -10, max: 160 }, speedX: -520, speedY: 260, rotate: 153, lifespan: 1100, scale: 2, alpha: { start: 1, end: 0 }, frequency: 1700 } };
+  const FALL = (tex, tints, freq, extra) => ({ tex, o: { x: { min: 0, max: 1000 }, y: -10, speedY: { min: 30, max: 70 }, speedX: { min: -35, max: 15 }, lifespan: 12000, scale: { min: 2, max: 3 }, rotate: { start: 0, end: 360 }, tint: tints, frequency: freq, ...(extra || {}) } });
+  const FX = {
+    magma: [{ tex: 'p_ember', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -90, max: -30 }, speedX: { min: -15, max: 15 }, lifespan: 6500, scale: { min: 2, max: 3 }, alpha: { start: 1, end: 0 }, frequency: 90 } }],
+    water: [{ tex: 'p_bubble', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -70, max: -25 }, speedX: { min: -8, max: 8 }, lifespan: 9000, scale: { min: 2, max: 3 }, frequency: 160 } },
+      FALL('p_petal', [0xffffff], 420, { speedY: { min: 15, max: 35 } })],
+    flower: [FALL('p_petal', [0xffffff, 0xfff0a0, 0xd0e0ff], 110), TWINKLE([0xfff6a8], 400)],
+    ground: [FALL('p_leaf', [0xffffff], 170)],
+    candy: [FALL('p_conf', [0xff4d6d, 0x4dc3ff, 0xffd23f, 0x7dff8a, 0xb388ff, 0xffffff], 60)],
+    oz: [FALL('p_petal', [0xff6060, 0xff3030], 220), TWINKLE([0x7dffb5, 0xfff6a8], 160)],
+    sky: [SNOW],
+    star: [TWINKLE([0xffffff, 0xfff6a8, 0xffd0f0], 70), SHOOT],
+    space: [TWINKLE([0xffffff, 0xfff6a8, 0xff8080, 0x80ff9a], 110), SHOOT],
+    xmas: [{ ...SNOW, o: { ...SNOW.o, frequency: 25 } }, TWINKLE([0xffd23f, 0xff6060, 0x7dff8a], 160)],
+  };
 
   class GameScene extends Phaser.Scene {
     constructor() { super('game'); }
@@ -248,8 +255,7 @@
       this.physics.world.setBounds(0, 0, S.WORLD_W, S.WORLD_H);
       const cam = this.cameras.main;
       cam.setBounds(0, 0, S.WORLD_W, S.WORLD_H).setRoundPixels(true);
-      for (let z = 0; z < S.ZONES.length; z++) this.add.image(0, S.zoneTop(z), 'bg' + z).setOrigin(0).setScale(PIXEL.BG_SCALE).setDepth(-10);
-      this.addAmbient();
+      this.bgImgs = {}; this.bands = {}; this.ambient = [];
 
       this.platforms = this.physics.add.staticGroup();
       this.gifts = this.physics.add.staticGroup();
@@ -272,10 +278,9 @@
       const kb = this.input.keyboard;
       this.keys = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', space: 'SPACE', a: 'A', d: 'D', w: 'W' });
 
-      this.fx = FX.map((list) => list.map(({ tex, o }) => {
-        const e = this.add.particles(0, 0, tex, { ...o, emitting: false }).setScrollFactor(0).setDepth(-5);
-        return e;
-      }));
+      this.fx = {};
+      for (const [k, list] of Object.entries(FX)) this.fx[k] = list.map(({ tex, o }) => this.add.particles(0, 0, tex, { ...o, emitting: false }).setScrollFactor(0).setDepth(-5));
+      this.preloadBgs();
       this.puff = this.add.particles(0, 0, 'p_puff', { speed: { min: 40, max: 130 }, angle: { min: 30, max: 150 }, lifespan: 380, scale: { start: 3, end: 0 }, emitting: false }).setDepth(9);
       this.dust = this.add.particles(0, 0, 'p_dust', { speed: { min: 20, max: 70 }, angle: { min: 180, max: 360 }, lifespan: 300, scale: { start: 2, end: 0 }, gravityY: 200, emitting: false }).setDepth(9);
       this.conf = this.add.particles(0, 0, 'p_conf', { speed: { min: 200, max: 480 }, angle: { min: 220, max: 320 }, gravityY: 700, lifespan: 2200, scale: 3,
@@ -301,16 +306,22 @@
       this.gifts.clear(true, true);
       this.springs.clear(true, true);
       if (this.summitOverlap) { this.summitOverlap.destroy(); this.summitZone.destroy(); }
+      Object.values(this.bgImgs).forEach((im) => im.destroy()); Object.values(this.bands).forEach((im) => im.destroy());
+      this.bgImgs = {}; this.bands = {};
+      this.ambient.forEach((o) => { this.tweens.killTweensOf(o); o.destroy(); }); this.ambient = [];
+      const order = this.level.order;
+      this.ensureBgAround(S.zoneOf(this.player.y));
+      this.addAmbient();
 
       this.level.platforms.forEach((p, i) => {
         // 텍스처는 위 8px 장식 + 아래 16px 발판. 충돌은 발판 부분만
-        const s = this.platforms.create(p.x + p.w / 2, p.y - PIXEL.SURF + PIXEL.PLAT_H / 2, PIXEL.ensurePlatform(this, p.zone, p.w, i % 3));
+        const s = this.platforms.create(p.x + p.w / 2, p.y - PIXEL.SURF + PIXEL.PLAT_H / 2, PIXEL.ensurePlatform(this, order[p.zone], p.w, i % 3));
         s.body.setSize(p.w, PIXEL.PLAT_H - PIXEL.SURF, false);
         s.body.setOffset(0, PIXEL.SURF);
         const c = s.body.checkCollision;
         c.down = false; c.left = false; c.right = false;   // 아래에서 뚫고 올라가는 발판
         if (p.kind === 'checkpoint') {
-          const z = S.ZONES[p.zone];
+          const z = S.THEMES[order[p.zone]];
           this.decor.push(this.label(p.x + p.w / 2, p.y - 78, `${z.emoji} ${z.name} · ${z.season}`, { ...LABEL, fontSize: '15px', color: '#fff6a8' }).setOrigin(0.5, 1).setDepth(3));
         }
       });
@@ -355,7 +366,7 @@
     }
 
     teleport(x, y) {
-      if (this.fx) { this.fx.forEach((list) => list.forEach((e) => { e.stop(); e.killAll(); })); this.zone = -1; }   // 다른 구역 눈·낙엽이 남지 않게
+      if (this.fx) { Object.values(this.fx).forEach((list) => list.forEach((e) => { e.stop(); e.killAll(); })); this.zone = -1; }   // 다른 구역 눈·낙엽이 남지 않게
       this.player.setPosition(x, y);
       this.player.body.setVelocity(0, 0);
       this.lastGroundY = y; this.whooshed = false; this.safeZone = S.zoneOf(y);
@@ -475,15 +486,17 @@
     updateZone(y) {
       const z = S.zoneOf(y);
       if (z === this.zone) return;
-      if (this.zone >= 0) this.fx[this.zone].forEach((e) => e.stop());
-      this.fx[z].forEach((e) => e.start());
-      if (this.zone >= 0) { const Z = S.ZONES[z]; toast(`${Z.emoji} ${Z.name} — ${Z.season}`); }
+      const order = this.level.order;
+      if (this.zone >= 0) this.fx[order[this.zone]].forEach((e) => e.stop());
+      this.fx[order[z]].forEach((e) => e.start());
+      if (this.zone >= 0) { const Z = S.THEMES[order[z]]; toast(`${Z.emoji} ${Z.name} — ${Z.season}`); }
       this.zone = z;
+      this.ensureBgAround(z);
     }
 
     updateHud(sNow, countdown, running) {
       const st = Net.state;
-      const Z = S.ZONES[this.zone < 0 ? 0 : this.zone];
+      const Z = S.THEMES[this.level.order[this.zone < 0 ? 0 : this.zone]];
       $('hudZone').textContent = `${Z.emoji} ${Z.name}`;
       $('hudHeight').textContent = `📏 ${S.heightOf(this.player.y)} m · 최고 ${this.lapBest} m`;
       $('hudScore').textContent = `⭐ ${this.laps * S.GAME.lapBonus + this.lapBest + this.correct * S.GAME.pointsPerCorrect}점`;
@@ -527,23 +540,82 @@
       AUDIO.sfx('boing');
     }
 
+    // 배경: 지금 구역과 위아래 구역만 만들어 붙이고, 경계는 색을 섞어 부드럽게
+    ensureBgAround(z) {
+      const order = this.level.order;
+      for (let zz = Math.max(0, z - 1); zz <= Math.min(S.ZONE_COUNT - 1, z + 1); zz++) {
+        if (this.bgImgs[zz]) continue;
+        const key = PIXEL.ensureBg(this, order[zz]);
+        this.bgImgs[zz] = this.add.image(0, S.zoneTop(zz), key).setOrigin(0).setScale(PIXEL.BG_SCALE).setDepth(-10);
+      }
+      for (let k = 1; k < S.ZONE_COUNT; k++) {
+        if (this.bands[k] || !this.bgImgs[k - 1] || !this.bgImgs[k]) continue;
+        const lower = PIXEL.bgEdges(order[k - 1]), upper = PIXEL.bgEdges(order[k]);
+        if (!lower || !upper) continue;
+        const key = `band_${order[k]}_${order[k - 1]}`;
+        if (!this.textures.exists(key)) {
+          const c = document.createElement('canvas'); c.width = 4; c.height = 160;
+          const g = c.getContext('2d');
+          for (let y = 0; y < 160; y++) {
+            const t = y / 159, a = Math.sin(Math.PI * t) * 0.92;
+            const col = upper.bottom.map((v, i) => Math.round(v + (lower.top[i] - v) * t));
+            g.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; g.fillRect(0, y, 4, 1);
+          }
+          this.textures.addCanvas(key, c).setFilter(Phaser.Textures.FilterMode.LINEAR);
+        }
+        const yb = S.WORLD_H - k * S.ZONE_H;
+        this.bands[k] = this.add.image(0, yb - 80, key).setOrigin(0).setDisplaySize(S.WORLD_W, 160).setDepth(-9.5);
+      }
+    }
+
+    // 나머지 배경은 쉬는 틈에 하나씩 미리 만들어 둔다(올라갈 때 끊김 방지)
+    preloadBgs() {
+      const todo = S.THEME_KEYS.slice();
+      const step = () => {
+        const k = todo.shift();
+        if (!k) return;
+        PIXEL.ensureBg(this, k);
+        setTimeout(step, 350);
+      };
+      setTimeout(step, 1200);
+    }
+
     addAmbient() {
-      const rnd = S.mulberry32(4242);
-      const zoneY = (z, a, b) => S.zoneTop(z) + S.ZONE_H * (a + rnd() * (b - a));
+      const order = this.level.order;
+      const rnd = S.mulberry32(4242 + this.seed);
+      const zoneY = (theme, a, b) => { const z = order.indexOf(theme); return S.zoneTop(z) + S.ZONE_H * (a + rnd() * (b - a)); };
+      const keep = (o) => { this.ambient.push(o); return o; };
       const swim = (obj, dist, dur) => this.tweens.add({ targets: obj, x: obj.x + dist, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut',
         onYoyo: () => obj.toggleFlipX(), onRepeat: () => obj.toggleFlipX() });
-      for (let i = 0; i < 10; i++) {           // 물고기
-        const f = this.add.image(60 + rnd() * 400, zoneY(1, 0.08, 0.9), 'fish' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.9);
-        swim(f, 300 + rnd() * 300, 7000 + rnd() * 7000);
-        this.tweens.add({ targets: f, y: f.y + 10, duration: 1400 + rnd() * 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      const bob = (obj, dy, dur) => this.tweens.add({ targets: obj, y: obj.y + dy, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      for (let i = 0; i < 10; i++) {           // 바닷속: 물고기
+        const f = keep(this.add.image(60 + rnd() * 400, zoneY('water', 0.08, 0.9), 'fish' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.9));
+        swim(f, 300 + rnd() * 300, 7000 + rnd() * 7000); bob(f, 10, 1400 + rnd() * 800);
       }
-      for (let i = 0; i < 6; i++) {            // 새
-        const b = this.add.sprite(40 + rnd() * 300, zoneY(2, 0.08, 0.6), 'bird').setScale(2).setDepth(-9).play('bird_fly');
+      for (let i = 0; i < 6; i++) {            // 단풍 마을: 새
+        const b = keep(this.add.sprite(40 + rnd() * 300, zoneY('ground', 0.08, 0.6), 'bird').setScale(2).setDepth(-9).play('bird_fly'));
         swim(b, 400 + rnd() * 200, 9000 + rnd() * 6000);
       }
-      for (let i = 0; i < 9; i++) {            // 떠다니는 구름
-        const c = this.add.image(rnd() * 960, zoneY(3, 0.05, 0.85), 'cloud' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.85);
+      for (let i = 0; i < 9; i++) {            // 겨울 하늘·산타 마을: 구름
+        const c = keep(this.add.image(rnd() * 960, zoneY(i < 6 ? 'sky' : 'xmas', 0.05, i < 6 ? 0.85 : 0.4), 'cloud' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.85));
         swim(c, 160 + rnd() * 200, 18000 + rnd() * 14000);
+      }
+      for (let i = 0; i < 9; i++) {            // 꽃나라: 나비
+        const b = keep(this.add.sprite(40 + rnd() * 600, zoneY('flower', 0.1, 0.9), 'butterfly' + (i % 3)).setScale(2).setDepth(-9).play('flutter' + (i % 3)));
+        swim(b, 150 + rnd() * 250, 5000 + rnd() * 4000); bob(b, 30, 900 + rnd() * 600);
+      }
+      for (let i = 0; i < 10; i++) {           // 과자나라: 둥실 젤리
+        const g = keep(this.add.image(30 + rnd() * 900, zoneY('candy', 0.05, 0.9), 'gum' + (i % 4)).setScale(2.5).setDepth(-9).setAlpha(0.95));
+        bob(g, 24, 1800 + rnd() * 1500); this.tweens.add({ targets: g, angle: 20, duration: 2000 + rnd() * 1000, yoyo: true, repeat: -1 });
+      }
+      for (let i = 0; i < 2; i++) {            // 오즈: 마법사 열기구
+        const b = keep(this.add.image(100 + rnd() * 300, zoneY('oz', 0.15, 0.6), 'balloon').setScale(3).setDepth(-9));
+        swim(b, 350 + rnd() * 150, 20000 + rnd() * 8000); bob(b, 40, 3000);
+      }
+      { // 산타 마을: 하늘을 가로지르는 썰매
+        const sl = keep(this.add.image(-120, zoneY('xmas', 0.12, 0.3), 'sleigh').setScale(2.5).setDepth(-9).setFlipX(true));
+        this.tweens.add({ targets: sl, x: 1100, duration: 14000, repeat: -1, repeatDelay: 4000 });
+        bob(sl, 20, 1200);
       }
     }
 

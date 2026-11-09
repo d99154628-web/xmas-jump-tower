@@ -56,7 +56,7 @@ tr.offline { opacity: .45; }
 tr.top1 td { color: var(--gold); } tr.top2 td { color: #e0e0ff; } tr.top3 td { color: #ffb37a; }
 
 .quizbank { margin: 14px 18px 24px; }
-.qb-grid { display: grid; grid-template-columns: 420px 1fr; gap: 16px; }
+.qb-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .upload { display: flex; flex-direction: column; gap: 8px; }
 .progress { height: 12px; background: #0008; border-radius: 6px; overflow: hidden; }
 #progFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--gold), #7dff8a); transition: width .3s; }

@@ -81,32 +81,13 @@
 
     <!-- 문제은행 -->
     <section class="card quizbank">
-      <h2>📚 문제은행 <span id="quizCount" class="badge">0문제</span> <span id="llmBadge" class="badge"></span></h2>
+      <h2>📚 문제은행 <span id="quizCount" class="badge">0문제</span> <span class="badge on">📘 6학년 7~10과 교과서 문제 · 다 풀면 보기를 섞어 계속 출제</span></h2>
       <div class="qb-grid">
-        <form id="uploadForm" class="upload">
-          <h3>📄 교사용 지도서 PDF → AI 문제 자동 생성</h3>
-          <label>PDF 파일 <input id="pdfFile" type="file" accept="application/pdf,.pdf" required></label>
-          <div class="row">
-            <label>쪽 범위 <input id="pages" placeholder="예: 210-236 (비우면 전체)"></label>
-            <label>문제 수 <input id="count" type="number" min="10" max="400" value="120"></label>
-          </div>
-          <div class="row">
-            <label>학년 <input id="grade" value="초등 6학년"></label>
-            <label>방식
-              <select id="mode"><option value="append">기존 문제에 추가</option><option value="replace">새 문제로 바꾸기</option></select>
-            </label>
-          </div>
-          <label>집중할 내용(선택) <input id="focus" placeholder="예: Lesson 11 Do you know anything about Tuho? 핵심 표현과 단어"></label>
-          <button id="uploadBtn" class="btn primary" type="submit">🤖 문제 만들기</button>
-          <div class="progress"><div id="progFill"></div></div>
-          <div id="jobMsg" class="msg"></div>
-          <p class="tip">만들어지는 대로 묶음마다 바로 게임에 들어가요(게임 중에도 OK). 지도서 전체보다 해당 단원 쪽 범위를 넣으면 더 정확하고 빨라요.</p>
-        </form>
 
         <div class="bank">
           <div class="bank-tools">
             <input id="search" placeholder="🔎 문제 검색">
-            <button id="sampleBtn" class="btn mini">기본 문제로</button>
+            <button id="sampleBtn" class="btn mini">📘 교과서 문제로 되돌리기</button>
             <button id="exportBtn" class="btn mini">JSON 저장</button>
             <label class="btn mini file">JSON 불러오기<input id="importFile" type="file" accept=".json,application/json"></label>
             <button id="clearBtn" class="btn mini danger">모두 지우기</button>

@@ -264,6 +264,38 @@
     return bufCanvas(b);
   }
 
+  function makeButterfly(c1) {
+    const c = makeCanvas(18, 7); const g = c.getContext('2d');
+    const frames = [['XX.B.XX', 'XXXBXXX', '.XXBXX.', '.X.B.X.'], ['.......', 'XXXBXXX', 'XXXBXXX', '...B...']];
+    frames.forEach((rows, f) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '.') return; g.fillStyle = ch === 'B' ? '#2b2236' : (x + y) % 3 ? c1 : '#ffffff'; g.fillRect(f * 9 + x + 1, y + 1, 1, 1); })));
+    return c;
+  }
+  function makeBalloon() {   // 오즈 마법사의 열기구
+    const b = Buf(16, 24);
+    b.ellipse(8, 7.5, 7, 7.5, (nx, ny, x) => { const stripe = Math.floor((nx + 1) * 3.5) % 2; const l = -(nx * 0.6 + ny * 0.8); return stripe ? (l > 0 ? '#7dffb5' : '#2fbf71') : (l > 0 ? '#fff3a0' : '#e0b030'); });
+    b.line(3, 14, 6, 19, '#5a3a1a'); b.line(12, 14, 10, 19, '#5a3a1a');
+    for (let y = 19; y <= 22; y++) for (let x = 5; x <= 11; x++) b.set(x, y, x < 7 ? '#c08040' : '#8a5a2b');
+    b.outline(0.6);
+    return bufCanvas(b);
+  }
+  function makeSleigh() {    // 산타 썰매 + 루돌프
+    const b = Buf(44, 14);
+    for (let x = 26; x <= 40; x++) for (let y = 4; y <= 9; y++) b.set(x, y, y < 6 ? '#ff5a5a' : '#c62828');
+    for (let x = 24; x <= 42; x++) b.set(x, 11, '#ffd23f'); b.set(43, 10, '#ffd23f'); b.set(23, 10, '#ffd23f');
+    b.ellipse(33, 3, 3, 2.5, '#e23a3a'); b.set(33, 0, '#ffffff'); b.ellipse(36, 4, 2.4, 2, '#8a5a2b');   // 산타 + 선물 자루
+    b.set(32, 3, '#ffd0b0'); b.set(31, 4, '#ffffff'); b.set(32, 5, '#ffffff');
+    for (const rx of [3, 13]) {
+      for (let x = rx; x <= rx + 7; x++) for (let y = 6; y <= 8; y++) b.set(x, y, '#a0673c');
+      b.set(rx + 1, 9, '#6b3e1e'); b.set(rx + 6, 9, '#6b3e1e'); b.set(rx + 1, 10, '#6b3e1e'); b.set(rx + 6, 10, '#6b3e1e');
+      b.ellipse(rx, 5, 1.8, 1.6, '#a0673c'); b.set(rx - 2, 5, rx === 3 ? '#ff3030' : '#3a2010'); b.line(rx, 3, rx - 1, 0, '#6b3e1e'); b.line(rx + 1, 3, rx + 3, 1, '#6b3e1e');
+      b.line(rx + 8, 7, rx + 10, 7, '#ffd23f');
+    }
+    b.line(21, 7, 25, 7, '#ffd23f');
+    b.outline(0.6);
+    return bufCanvas(b);
+  }
+  function makeGumdrop(c) { const b = Buf(10, 10); b.ellipse(5, 5.5, 4.4, 4.2, (nx, ny) => (nx + ny < -0.6 ? '#ffffff' : nx + ny < 0 ? shadeHex(c, 1.3) : c)); b.outline(0.65); return bufCanvas(b); }
+
   function makeDot(w, h, painter) { const c = makeCanvas(w, h); painter(c.getContext('2d')); return c; }
   const PARTICLES = {
     p_ember: () => makeDot(2, 2, (g) => { g.fillStyle = '#ffb347'; g.fillRect(0, 0, 2, 2); g.fillStyle = '#fff1a8'; g.fillRect(0, 0, 1, 1); }),
@@ -280,7 +312,8 @@
 
   /* ================= 발판 (폭 w x 24, 윗면 y=8, 위 8줄은 장식) ================= */
   const PLAT_H = 24, SURF = 8;
-  function makePlatform(zone, w, variant = 0) {
+  function makePlatform(theme, w, variant = 0) {
+    const zone = S.THEME_KEYS.indexOf(theme);
     const b = Buf(w, PLAT_H);
     const rnd = S.mulberry32(zone * 7919 + w * 31 + variant * 104729);
     const r = (a, c) => a + rnd() * (c - a);
@@ -288,7 +321,7 @@
     const inside = (x, y) => y >= SURF && x >= inset(y) && x < w - inset(y);
     const fillBody = (fn) => { for (let y = SURF; y < PLAT_H; y++) for (let x = 0; x < w; x++) if (inside(x, y)) b.set(x, y, fn(x, y)); };
 
-    if (zone === 0) {            // 마그마: 현무암 벽돌 + 빛나는 균열 + 용암 방울
+    if (theme === 'magma') {     // 마그마: 현무암 벽돌 + 빛나는 균열 + 용암 방울
       fillBody((x, y) => (y === 8 ? '#9a6e60' : y === 9 ? '#7a5448' : '#4a3434'));
       for (const [y0, y1] of [[10, 15], [16, 22]]) {
         let x = Math.floor(r(-6, 0));
@@ -310,7 +343,7 @@
         const x = Math.floor(r(4, w - 5));
         b.set(x, 7, '#ff9a3c'); b.set(x + 1, 7, '#c2410c'); b.set(x - 1, 7, '#ffd27a'); b.set(x, 6, '#ffd27a'); b.set(x, 5, '#ff9a3c'); b.set(x + 1, 6, '#ff9a3c');
       }
-    } else if (zone === 1) {     // 바닷속(봄): 모래 + 바위 층 + 산호·미역·불가사리
+    } else if (theme === 'water') { // 바닷속(봄): 모래 + 바위 층 + 산호·미역·불가사리
       fillBody((x, y) => {
         if (y === 8) return '#fff0c8';
         if (y <= 10) return (x + y * 2) % 7 === 0 ? '#e8c088' : '#f5d6a0';
@@ -326,7 +359,7 @@
         else if (kind < 0.75) { b.line(x, 7, x, 4, '#ff6f91'); b.line(x, 5, x - 2, 3, '#ff8fab'); b.line(x, 5, x + 2, 2, '#ff8fab'); b.set(x - 2, 2, '#ffc2d1'); b.set(x + 2, 1, '#ffc2d1'); }
         else { b.set(x, 7, '#ff9a3c'); b.set(x - 1, 7, '#ff9a3c'); b.set(x + 1, 7, '#ff9a3c'); b.set(x, 6, '#ff9a3c'); b.set(x - 1, 8, '#e8762b'); b.set(x + 1, 8, '#e8762b'); b.set(x, 7, '#ffd27a'); }
       }
-    } else if (zone === 2) {     // 땅(가을): 풀 + 흙 + 돌·뿌리 + 버섯·호박
+    } else if (theme === 'ground') { // 땅(가을): 풀 + 흙 + 돌·뿌리 + 버섯·호박
       fillBody((x, y) => {
         if (y <= 11) {
           const leaf = rnd();
@@ -345,7 +378,7 @@
         else if (k < 0.2 && x < w - 5) { b.set(x + 1, 7, '#f3e6d0'); b.set(x + 1, 6, '#f3e6d0'); for (let xx = x; xx <= x + 2; xx++) b.set(xx, 5, '#e23a3a'); b.set(x + 1, 4, '#e23a3a'); b.set(x, 5, '#ff6060'); b.set(x + 1, 5, '#ffffff'); x += 4; }
         else if (k < 0.215 && x < w - 6) { for (let xx = x; xx <= x + 4; xx++) for (let y = 5; y <= 7; y++) b.set(xx, y, xx === x ? '#ffad4d' : (xx === x + 2 ? '#d9701c' : '#f08a24')); b.set(x + 2, 4, '#5f7d1e'); x += 6; }
       }
-    } else if (zone === 3) {     // 하늘(겨울): 음영 있는 눈 구름 + 고드름
+    } else if (theme === 'sky') {  // 하늘(겨울): 음영 있는 눈 구름 + 고드름
       const col = (y) => (y <= 9 ? '#ffffff' : y < 13 ? '#f4f9ff' : y < 16 ? '#dceaf9' : y < 19 ? '#c3d8f1' : '#a9c3e6');
       for (let x = 3; x < w + 6; x += Math.floor(r(6, 10))) b.ellipse(Math.min(x, w - 4), 13.5, r(4.5, 6.5), 5.6, (nx, ny, xx, y) => col(y));
       for (let y = 12; y <= 19; y++) for (let x = 2; x < w - 2; x++) b.set(x, y, col(y));
@@ -353,6 +386,83 @@
       for (let k = 0; k < w / 10; k++) b.set(r(3, w - 3), r(9, 14), '#e6f4ff');
       for (let k = 0; k < w / 26; k++) { const x = Math.floor(r(5, w - 5)); const h = Math.floor(r(2, 4)); for (let i = 0; i < h; i++) b.set(x, 20 + i, i === h - 1 ? '#e6f6ff' : '#bfe4ff'); }
       for (let k = 0; k < w / 30; k++) { const x = r(4, w - 4); b.set(x, 8, '#ffffff'); b.set(x + 1, 7, '#ffffff'); }
+    } else if (theme === 'flower') {   // 꽃나라: 이끼 흙 + 데이지·튤립
+      fillBody((x, y) => {
+        if (y === 8) return '#b6f07a';
+        if (y <= 10) return (x * 3 + y) % 11 === 0 ? '#5fbf3a' : '#7fd65a';
+        if (y === 11) return '#5fae3a';
+        const t = (y - 12) / 11;
+        if ((x * 7 + y * 13) % 29 === 0) return '#ffc2d8';
+        return rgbToHex(mixRgb(rgbOf('#d9b88a'), rgbOf('#a8825a'), t).map(Math.round));
+      });
+      for (let k = 0; k < w / 16; k++) b.ellipse(r(4, w - 4), r(14, 21), 1.4, 1, (nx, ny) => (ny < 0 ? '#f0d8c0' : '#c9a882'));
+      for (let x = 3; x < w - 3; x += Math.floor(r(6, 13))) {
+        const kind = rnd();
+        if (kind < 0.45) { // 데이지
+          const c = ['#ffffff', '#ffd6e8', '#fff3a8'][Math.floor(rnd() * 3)];
+          b.set(x, 7, '#4caf50'); b.set(x, 6, '#4caf50');
+          b.set(x, 4, c); b.set(x - 1, 5, c); b.set(x + 1, 5, c); b.set(x, 3, c); b.set(x - 1, 3, c); b.set(x + 1, 3, c); b.set(x - 1, 4, c); b.set(x + 1, 4, c);
+          b.set(x, 4, '#ffb300');
+        } else if (kind < 0.75) { // 튤립
+          const c = ['#ff4d6d', '#ff8fab', '#ffb347', '#b388ff'][Math.floor(rnd() * 4)];
+          b.line(x, 7, x, 4, '#3f9b3a'); b.set(x + 1, 6, '#5fbf3a');
+          b.set(x - 1, 3, c); b.set(x, 3, shadeHex(c, 1.3)); b.set(x + 1, 3, c); b.set(x - 1, 2, c); b.set(x + 1, 2, c); b.set(x, 2, shadeHex(c, 0.8));
+        } else { b.set(x, 7, '#86d65a'); b.set(x + 1, 6, '#86d65a'); b.set(x - 1, 6, '#5fbf3a'); }
+      }
+    } else if (theme === 'candy') {    // 과자나라: 초콜릿 바 + 딸기 크림 + 스프링클
+      fillBody((x, y) => {
+        const sx = x % 16, sy = (y - 8) % 8;
+        if (sx === 0 || sy === 7) return '#4a2814';
+        if (sx === 1 || sy === 0) return '#a8703f';
+        return '#7a4a2a';
+      });
+      const sprink = ['#ff4d6d', '#4dc3ff', '#ffd23f', '#7dff8a', '#ffffff', '#b388ff'];
+      for (let x = 0; x < w; x++) {
+        const drip = 10 + (rnd() < 0.18 ? Math.floor(r(1, 4)) : 0) + Math.round(Math.sin(x / 3) * 0.6);
+        for (let y = 8; y <= drip; y++) if (inside(x, y)) b.set(x, y, y === 8 ? '#ffd6ec' : y === drip ? '#e86aa8' : '#ff9ecf');
+        if (rnd() < 0.2 && inside(x, 9)) b.set(x, 9, sprink[Math.floor(rnd() * sprink.length)]);
+      }
+      for (let y = 8; y < 24; y++) for (const xx of [0, 1, 2, 3, w - 4, w - 3, w - 2, w - 1]) if (inside(xx, y)) b.set(xx, y, (xx + y) % 4 < 2 ? '#ff3b3b' : '#ffffff');
+      for (let x = 6; x < w - 6; x += Math.floor(r(14, 26))) {
+        const c = sprink[Math.floor(rnd() * 4)];
+        if (rnd() < 0.5) { b.ellipse(x, 5.5, 2.4, 2, (nx, ny) => (nx + ny < -0.4 ? shadeHex(c, 1.4) : c)); }   // 젤리
+        else { b.ellipse(x, 5.5, 2, 1.6, c); b.set(x - 3, 5, c); b.set(x - 3, 6, c); b.set(x + 3, 5, c); b.set(x + 3, 6, c); b.set(x - 1, 5, '#ffffff'); }   // 사탕
+      }
+    } else if (theme === 'oz') {       // 오즈: 노란 벽돌길 + 양귀비 + 에메랄드
+      fillBody((x, y) => {
+        if (y === 8) return '#fff0a0';
+        const row = Math.floor((y - 9) / 4), off = row % 2 ? 5 : 0;
+        if ((y - 9) % 4 === 3 || (x + off) % 10 === 0) return '#b8862a';
+        if ((y - 9) % 4 === 0 || (x + off) % 10 === 1) return '#ffe27a';
+        return y > 19 ? '#d9a832' : '#f2c94c';
+      });
+      for (let x = 0; x < w; x++) if (inside(x, 23)) b.set(x, 23, '#3f9b3a');
+      for (let x = 4; x < w - 4; x += Math.floor(r(9, 18))) {
+        if (rnd() < 0.65) { b.line(x, 7, x, 5, '#2e7d32'); b.ellipse(x, 3.6, 1.8, 1.5, (nx, ny) => (ny < 0 ? '#ff5252' : '#c62828')); b.set(x, 4, '#1b1b1b'); }
+        else { b.set(x, 6, '#2fbf71'); b.set(x - 1, 6, '#1f8a50'); b.set(x + 1, 6, '#1f8a50'); b.set(x, 5, '#7dffb5'); b.set(x, 7, '#1f8a50'); }
+      }
+    } else if (theme === 'star') {     // 별나라: 꿈빛 구름 + 작은 별
+      const col = (y) => (y <= 9 ? '#efe7ff' : y < 13 ? '#d6c8ff' : y < 17 ? '#b9a4ff' : y < 20 ? '#9c86ee' : '#7f69d6');
+      for (let x = 3; x < w + 6; x += Math.floor(r(6, 10))) b.ellipse(Math.min(x, w - 4), 13.5, r(4.5, 6.5), 5.6, (nx, ny, xx, y) => col(y));
+      for (let y = 12; y <= 19; y++) for (let x = 2; x < w - 2; x++) b.set(x, y, col(y));
+      for (let k = 0; k < w / 8; k++) b.set(r(3, w - 3), r(10, 19), rnd() < 0.5 ? '#fff6a8' : '#ffffff');
+      for (let x = 6; x < w - 6; x += Math.floor(r(12, 22))) {
+        const yy = Math.floor(r(3, 6));
+        b.set(x, yy, '#ffe066'); b.set(x - 1, yy + 1, '#ffe066'); b.set(x + 1, yy + 1, '#ffe066'); b.set(x, yy + 1, '#ffffff');
+        b.set(x - 2, yy + 1, '#ffd23f'); b.set(x + 2, yy + 1, '#ffd23f'); b.set(x - 1, yy + 2, '#ffd23f'); b.set(x + 1, yy + 2, '#ffd23f');
+      }
+    } else if (theme === 'xmas') {     // 산타 마을: 진저브레드 + 눈 + 지팡이 사탕
+      fillBody((x, y) => {
+        if (y <= 11 + (x % 7 === 0 ? 1 : 0)) return y === 8 ? '#ffffff' : y === 11 || y === 12 ? '#cfe3f7' : '#f4f9ff';
+        if (y === 16) return x % 4 < 2 ? '#ffffff' : '#9a5a26';
+        if (y === 17 && x % 4 === 1) return '#ffffff';
+        return y > 20 ? '#8a4a1c' : (x * 5 + y * 3) % 23 === 0 ? '#d08a4a' : '#b8733a';
+      });
+      for (let k = 0; k < w / 22; k++) { const x = Math.floor(r(5, w - 5)); const h = Math.floor(r(2, 4)); for (let i = 0; i < h; i++) b.set(x, 21 + i, i === h - 1 ? '#e6f6ff' : '#bfe4ff'); }
+      for (let x = 10; x < w - 8; x += Math.floor(r(26, 44))) {
+        if (rnd() < 0.6) { for (let y = 1; y <= 7; y++) b.set(x, y, y % 2 ? '#ff3b3b' : '#ffffff'); b.set(x + 1, 1, '#ffffff'); b.set(x + 2, 1, '#ff3b3b'); b.set(x + 2, 2, '#ffffff'); }
+        else { for (let yy = 4; yy <= 7; yy++) for (let xx = x - 2; xx <= x + 2; xx++) b.set(xx, yy, xx === x ? '#ffd23f' : '#2e9e4f'); b.set(x - 1, 3, '#ffd23f'); b.set(x + 1, 3, '#ffd23f'); }
+      }
     } else {                     // 우주(크리스마스): 금속 패널 + 경고 줄무늬 + 전구 줄
       fillBody((x, y) => {
         if (y === 8) return '#e3e9fb';
@@ -434,8 +544,8 @@
     for (let x = Math.round(cx - s * 1.8); x < cx + s * 1.9; x++) img.set(x, cy + Math.round(s * 0.75), t3);
   }
 
-  const BG = [
-    function magma(img, rnd) {
+  const BG = {
+    magma(img, rnd) {
       gradient(img, ['#12030a', '#2a0710', '#4a0d0c', '#73190a', '#a8320c', '#d24a10']);
       const wall = H('#1c0609'), wallHi = H('#3d0f0a'), rim = H('#ff5a1f');
       for (let y = 0; y < BH; y++) {         // 양쪽 동굴 벽
@@ -486,7 +596,7 @@
       for (let i = 0; i < 160; i++) img.set(rnd() * BW, 300 + rnd() * 540, H(rnd() < 0.5 ? '#ff9a3c' : '#ffd23f'));
     },
 
-    function water(img, rnd) {
+    water(img, rnd) {
       gradient(img, ['#5cc6f0', '#2f95d6', '#1c6fb3', '#13508f', '#0c356a', '#082450']);
       const white = [255, 255, 255];
       for (let y = 0; y < 260; y++) for (let x = 0; x < BW; x++) {   // 물결 빛(코스틱)
@@ -548,7 +658,7 @@
       for (let i = 0; i < 90; i++) img.ring(rnd() * BW, rnd() * 820, 1 + Math.floor(rnd() * 3), H('#bff0ff'));
     },
 
-    function ground(img, rnd) {
+    ground(img, rnd) {
       gradient(img, ['#4a86d4', '#5f9be0', '#7cb5ec', '#a5d0f4', '#d4ecfa'], 0, 640);
       img.glow(390, 120, 90, H('#fff6c8'), 0.55);
       img.circle(390, 120, 24, ball('#fffbe0', '#fff3b0', '#ffe27a'));
@@ -585,7 +695,7 @@
       for (let i = 0; i < 70; i++) img.set(rnd() * BW, rnd() * 760, H(['#e8762b', '#f2b134', '#d94f2b'][i % 3]));
     },
 
-    function sky(img, rnd) {
+    sky(img, rnd) {
       gradient(img, ['#1d2a5c', '#2a3f86', '#3b5aa8', '#4a72c4', '#4a86d4']);
       for (let y = 0; y < 260; y++) for (let x = 0; x < BW; x++) {    // 오로라
         const v = Math.sin(x / 40 + Math.sin(y / 30) * 1.5) * 0.5 + 0.5;
@@ -613,7 +723,7 @@
       for (let i = 0; i < 320; i++) { const x = rnd() * BW, y = rnd() * BH; img.set(x, y, [255, 255, 255]); if (i % 9 === 0) { img.set(x - 1, y, [230, 240, 255]); img.set(x + 1, y, [230, 240, 255]); img.set(x, y - 1, [230, 240, 255]); img.set(x, y + 1, [230, 240, 255]); } }
     },
 
-    function space(img, rnd) {
+    space(img, rnd) {
       gradient(img, ['#010106', '#04041a', '#0a0a2e', '#12124a', '#1a1f5c', '#1d2a5c']);
       const neb = ['#3b1f6e', '#1f3b6e', '#5a1f5e', '#1f5a6e'];
       for (let n = 0; n < 7; n++) {         // 성운 2단 디더링
@@ -657,12 +767,202 @@
       for (let k = -16; k <= 16; k++) { img.set(360 + k, 70, [255, 250, 220]); img.set(360, 70 + k, [255, 250, 220]); if (Math.abs(k) < 7) { img.set(360 + k, 70 + k, [255, 245, 200]); img.set(360 + k, 70 - k, [255, 245, 200]); } }
       for (let y = 820; y < BH; y++) for (let x = 0; x < BW; x++) img.blend(x, y, H('#2a4590'), 0.5 * ((y - 820) / 80) ** 2);
     },
-  ];
+    flower(img, rnd) {
+      gradient(img, ['#9fdcff', '#bfe9ff', '#dff3ff', '#fde2f3', '#ffd0e8']);
+      // 무지개
+      const rb = ['#ff6b6b', '#ffb347', '#ffe066', '#7dd87d', '#6bb8ff', '#b388ff'];
+      for (let i = 0; i < rb.length; i++) for (let a = Math.PI; a < 2 * Math.PI; a += 0.004) {
+        const rr = 210 - i * 7; for (let t = 0; t < 7; t++) img.blend(240 + Math.cos(a) * (rr - t), 360 + Math.sin(a) * (rr - t), H(rb[i]), 0.55);
+      }
+      img.glow(80, 90, 70, H('#fff6c8'), 0.6);
+      img.circle(80, 90, 26, ball('#fffbe0', '#ffe27a', '#ffc94a'));
+      img.set(72, 86, [90, 60, 40]); img.set(73, 86, [90, 60, 40]); img.set(87, 86, [90, 60, 40]); img.set(88, 86, [90, 60, 40]);
+      for (let x = 72; x <= 88; x++) img.set(x, 98 + Math.round(Math.sin(((x - 72) / 16) * Math.PI) * 3), [200, 90, 60]);
+      for (let i = 0; i < 7; i++) cloud(img, rnd, rnd() * BW, 60 + rnd() * 300, 10 + Math.floor(rnd() * 8), ['#ffffff', '#fff0f8', '#f5d8ec']);
+      const hills = [[640, 22, 60, '#b8f0a0', '#a4e48c'], [700, 16, 44, '#8fdc72', '#7fcf62'], [760, 12, 33, '#6fc552', '#5fb544']];
+      hills.forEach(([base, amp, per, c1, c2], li) => {
+        for (let x = 0; x < BW; x++) { const t = Math.round(base + Math.sin(x / per + li * 2) * amp); for (let y = t; y < BH; y++) img.set(x, y, H((x * 3 + y) % 19 === 0 ? c2 : c1)); }
+      });
+      const petals = ['#ff6fa8', '#ffb347', '#b388ff', '#ff5252', '#ffffff', '#6bb8ff'];
+      for (let i = 0; i < 9; i++) {         // 커다란 꽃
+        const x = 20 + rnd() * 440, base = 700 + rnd() * 160, h = 120 + rnd() * 230, c = petals[i % petals.length], r = 14 + Math.floor(rnd() * 10);
+        for (let y = base - h; y < base; y++) { img.set(x + Math.sin(y / 30) * 3, y, H('#3f9b3a')); img.set(x + 1 + Math.sin(y / 30) * 3, y, H('#2e7d32')); }
+        img.circle(x - 10, base - h * 0.45, 7, ball('#8fe070', '#5fbf3a', '#3f9b3a'));
+        const fx = x + Math.sin((base - h) / 30) * 3, fy = base - h;
+        for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; img.circle(fx + Math.cos(a) * r * 0.9, fy + Math.sin(a) * r * 0.9, Math.round(r * 0.6), ball(shadeHex(c, 1.3), c, shadeHex(c, 0.75))); }
+        img.circle(fx, fy, Math.round(r * 0.45), ball('#fff1a8', '#ffd23f', '#e0a000'));
+      }
+      for (let i = 0; i < 4; i++) {         // 버섯 집
+        const x = 40 + rnd() * 400, y = 790 + rnd() * 70;
+        img.rect(x - 9, y - 20, 18, 20, H('#fff3e0')); img.rect(x + 4, y - 20, 5, 20, H('#ead6bc'));
+        img.rect(x - 3, y - 10, 6, 10, H('#8a5a2b')); img.circle(x + 2, y - 5, 1, H('#ffd23f'));
+        for (let yy = 0; yy < 14; yy++) { const hw = 22 * Math.sqrt(1 - ((yy - 14) / 14) ** 2); for (let xx = -hw; xx <= hw; xx++) img.set(x + xx, y - 20 - 14 + yy, H(xx < -hw / 3 ? '#ff6b6b' : '#e53935')); }
+        for (let k = 0; k < 5; k++) img.circle(x - 14 + k * 7, y - 28 + (k % 2) * 4, 2, H('#ffffff'));
+      }
+      for (let i = 0; i < 250; i++) { const x = rnd() * BW, y = 640 + rnd() * 260, c = H(petals[i % petals.length]); img.set(x, y, c); img.set(x + 1, y, c); img.set(x, y - 1, H('#fff6c8')); }
+      for (let i = 0; i < 8; i++) { const x = rnd() * BW, y = 200 + rnd() * 400, c = H(petals[i % 5]); img.rect(x - 3, y - 2, 3, 3, c); img.rect(x + 1, y - 2, 3, 3, c); img.set(x, y, [40, 30, 40]); img.set(x, y - 1, [40, 30, 40]); }
+    },
 
-  function makeBackground(zone) {
+    candy(img, rnd) {
+      gradient(img, ['#ffd6ec', '#ffc8e6', '#ffbfe0', '#ffd8c8', '#ffe8b8']);
+      for (let i = 0; i < 9; i++) cloud(img, rnd, rnd() * BW, 50 + rnd() * 380, 11 + Math.floor(rnd() * 9), i % 2 ? ['#ffffff', '#ffe0f2', '#ffc0e0'] : ['#ffffff', '#dff2ff', '#bfe0ff']);
+      for (let i = 0; i < 4; i++) {         // 아이스크림 산
+        const cx = 40 + rnd() * 400, base = 760, h = 160 + rnd() * 120, half = 70 + rnd() * 40;
+        const cols = [['#fff6e8', '#ffe8cc'], ['#ffb3d1', '#ff8fbf'], ['#c8f0d8', '#a0e0bc'], ['#d8c0ff', '#bca0f0']][i % 4];
+        for (let y = Math.round(base - h); y < base; y++) {
+          const hw = ((y - (base - h)) / h) * half;
+          for (let x = cx - hw; x <= cx + hw; x++) img.set(x, y, H(x < cx - hw / 3 ? cols[0] : cols[1]));
+        }
+        for (let x = cx - 25; x <= cx + 25; x += 4) { const len = 10 + Math.abs(Math.sin(x)) * 25; for (let y = 0; y < len; y++) img.set(x, base - h + 25 + y + Math.abs(x - cx) * (h / half) * 0.5, H('#7a4a2a')); }
+      }
+      for (let i = 0; i < 7; i++) {         // 막대사탕 나무
+        const x = 20 + rnd() * 440, base = 790 + rnd() * 60, h = 70 + rnd() * 120, r = 16 + Math.floor(rnd() * 8);
+        img.rect(x - 1, base - h, 3, h, H('#ffffff')); img.rect(x + 1, base - h, 1, h, H('#e0e0e8'));
+        const c1 = ['#ff4d6d', '#4dc3ff', '#7dd87d', '#b388ff'][i % 4];
+        img.circle(x, base - h - r, r, (nx, ny) => { const a = Math.atan2(ny, nx), d = Math.hypot(nx, ny); return H(Math.floor((a + d * 6) / (Math.PI / 3)) % 2 ? c1 : '#ffffff'); });
+      }
+      for (let i = 0; i < 6; i++) {         // 지팡이 사탕
+        const x = rnd() * BW, base = 860, h = 80 + rnd() * 60;
+        for (let y = base - h; y < base; y++) for (let t = 0; t < 5; t++) img.set(x + t, y, H(((y + t) >> 2) % 2 ? '#ff3b3b' : '#ffffff'));
+        for (let a = Math.PI; a < 2 * Math.PI; a += 0.05) for (let t = 0; t < 5; t++) img.set(x + 9 + Math.cos(a) * (9 - t + 2), base - h + Math.sin(a) * (9 - t + 2), H(Math.floor(a * 3) % 2 ? '#ff3b3b' : '#ffffff'));
+      }
+      { // 진저브레드 하우스
+        const x = 300 + rnd() * 100, y = 800;
+        img.rect(x, y - 40, 60, 40, H('#b8733a')); img.rect(x + 45, y - 40, 15, 40, H('#9a5a26'));
+        for (let k = 0; k < 30; k++) img.line(x - 6 + k, y - 40 - k, x + 66 - k, y - 40 - k, H(k % 6 < 2 ? '#ffffff' : '#ff8fbf'));
+        img.rect(x + 24, y - 20, 12, 20, H('#6b3e1e')); img.rect(x + 6, y - 30, 10, 10, H('#ffd23f')); img.rect(x + 44, y - 30, 10, 10, H('#ffd23f'));
+        for (let k = 0; k < 6; k++) img.circle(x + 5 + k * 10, y - 42, 2, H(['#ff4d6d', '#7dd87d', '#4dc3ff'][k % 3]));
+      }
+      for (let x = 0; x < BW; x++) {         // 초콜릿 강
+        const t = Math.round(852 + Math.sin(x / 16) * 4);
+        for (let y = t; y < BH; y++) img.set(x, y, H(y < t + 2 ? '#a8703f' : (x + y * 2) % 15 < 2 ? '#8a5a32' : '#6b3e1e'));
+      }
+      const sp = ['#ff4d6d', '#4dc3ff', '#ffd23f', '#7dff8a', '#b388ff', '#ffffff'];
+      for (let i = 0; i < 260; i++) { const x = rnd() * BW, y = rnd() * 840, c = H(sp[i % sp.length]); img.set(x, y, c); img.set(x + 1, y + (i % 2), c); }
+    },
+
+    oz(img, rnd) {
+      gradient(img, ['#5fbfff', '#7fd0ff', '#a6e0ff', '#d4f2ff', '#e8fff0']);
+      const rb = ['#ff6b6b', '#ffb347', '#ffe066', '#7dd87d', '#6bb8ff', '#b388ff'];
+      for (let i = 0; i < rb.length; i++) for (let a = Math.PI; a < 2 * Math.PI; a += 0.003) {
+        const rr = 300 - i * 9; for (let t = 0; t < 9; t++) img.blend(260 + Math.cos(a) * (rr - t), 560 + Math.sin(a) * (rr - t), H(rb[i]), 0.45);
+      }
+      for (let i = 0; i < 6; i++) cloud(img, rnd, rnd() * BW, 40 + rnd() * 260, 10 + Math.floor(rnd() * 8), ['#ffffff', '#eef8ff', '#cfe6f5']);
+      { // 회오리와 날아가는 집
+        const tx = 60 + rnd() * 40;
+        for (let y = 120; y < 520; y++) { const hw = 6 + (520 - y) * 0.11; for (let x = -hw; x <= hw; x++) { const v = Math.sin(y / 6 + x / 5); img.blend(tx + x + Math.sin(y / 40) * 12, y, H(v > 0.3 ? '#8a8a9a' : '#6a6a7a'), 0.75); } }
+        const hx = tx + 30, hy = 170;
+        img.rect(hx, hy, 18, 12, H('#c9a87a')); for (let k = 0; k < 9; k++) img.line(hx - 2 + k, hy - k, hx + 20 - k, hy - k, H('#8a3a2a'));
+        img.rect(hx + 7, hy + 5, 4, 7, H('#5a3a1a'));
+      }
+      { // 에메랄드 시티
+        const cx = 330, base = 600;
+        img.glow(cx, base - 90, 130, H('#7dffb5'), 0.35);
+        const towers = [[-80, 90, 14], [-55, 140, 16], [-28, 120, 14], [0, 200, 20], [28, 130, 14], [55, 160, 16], [82, 100, 14]];
+        for (const [dx, h, w] of towers) {
+          for (let y = base - h; y < base; y++) for (let x = -w / 2; x <= w / 2; x++) img.set(cx + dx + x, y, H(x < -w / 6 ? '#7dffb5' : x < w / 4 ? '#2fbf71' : '#1f8a50'));
+          for (let k = 0; k < w; k++) for (let y = 0; y < k * 1.6; y++) img.set(cx + dx - w / 2 + k * 0.5, base - h - (w * 1.6 - y) + (w - k) * 0, H('#2fbf71'));
+          for (let y = 0; y < w * 1.5; y++) { const hw = (y / (w * 1.5)) * (w / 2); for (let x = -hw; x <= hw; x++) img.set(cx + dx + x, base - h - w * 1.5 + y, H(x < 0 ? '#9affc8' : '#2fbf71')); }
+          for (let y = base - h + 10; y < base - 6; y += 14) img.rect(cx + dx - 2, y, 4, 6, H('#e8fff0'));
+        }
+      }
+      for (let x = 0; x < BW; x++) { const t = Math.round(620 + Math.sin(x / 50) * 10); for (let y = t; y < BH; y++) img.set(x, y, H((x * 3 + y) % 21 === 0 ? '#5fae3a' : '#7fcf62')); }
+      // 노란 벽돌길(원근)
+      for (let y = 620; y < BH; y++) {
+        const t = (y - 620) / (BH - 620), cx = 330 - t * 120 + Math.sin(t * 5) * 40, hw = 4 + t * 70;
+        for (let x = cx - hw; x <= cx + hw; x++) { const brick = (Math.floor(y / (3 + t * 6)) + Math.floor((x - cx) / (5 + t * 10))) % 2; img.set(x, y, H(brick ? '#f2c94c' : '#ffe27a')); }
+        img.set(cx - hw, y, H('#b8862a')); img.set(cx + hw, y, H('#b8862a'));
+      }
+      for (let i = 0; i < 420; i++) { const x = rnd() * BW, y = 640 + rnd() * 260; if (img.get(x, y)[1] > 150 && img.get(x, y)[0] < 200) { img.set(x, y, H('#e53935')); img.set(x + 1, y, H('#ff5252')); img.set(x, y + 1, H('#b71c1c')); } }
+    },
+
+    star(img, rnd) {
+      gradient(img, ['#140b33', '#22125a', '#33207a', '#4a2f99', '#6b4fc0', '#8f6fd9']);
+      const neb = ['#5a3fb0', '#7a4fd0', '#3f5fd0'];
+      for (let n = 0; n < 5; n++) {
+        const cx = rnd() * BW, cy = rnd() * 800, r = 60 + rnd() * 70, col = H(neb[n % 3]);
+        for (let y = cy - r; y < cy + r; y++) for (let x = cx - r; x < cx + r; x++) { const d = Math.hypot(x - cx, (y - cy) * 1.3) / r; if (d < 1 && (1 - d) * 16 > BAYER[y & 3][x & 3] + 6) img.set(x, y, col); }
+      }
+      for (let i = 0; i < 600; i++) img.set(rnd() * BW, rnd() * BH, H(['#ffffff', '#fff6a8', '#ffd0f0', '#c8d8ff'][i % 4]));
+      // 별자리
+      for (let c = 0; c < 4; c++) {
+        let px = rnd() * BW, py = 40 + rnd() * 700;
+        for (let k = 0; k < 5; k++) { const nx = px + (rnd() - 0.4) * 70, ny = py + (rnd() - 0.5) * 50; for (let t = 0; t <= 1; t += 0.02) img.blend(px + (nx - px) * t, py + (ny - py) * t, [220, 220, 255], 0.5); img.glow(px, py, 6, [255, 250, 220], 0.9); px = nx; py = ny; }
+      }
+      // 잠자는 초승달(모자 쓴)
+      const mx = 330, my = 230, R = 70;
+      img.glow(mx, my, 150, H('#fff6c8'), 0.35);
+      for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+        if (x * x + y * y > R * R) continue;
+        if ((x - 34) ** 2 + (y + 14) ** 2 < (R * 0.86) ** 2) continue;
+        const l = -(x * 0.6 + y * 0.8) / R;
+        img.set(mx + x, my + y, H(l > 0.3 ? '#fff8d0' : l > -0.3 ? '#ffe680' : '#e6c040'));
+      }
+      for (let k = 0; k < 9; k++) img.set(mx - 40 + k, my + 2 + Math.round(Math.sin((k / 8) * Math.PI) * 3), H('#7a5a20'));   // 감은 눈
+      img.circle(mx - 52, my + 22, 5, H('#ffb0b0'));
+      for (let y = 0; y < 50; y++) { const hw = 3 + y * 0.5; for (let x = -hw; x <= hw; x++) img.set(mx - 40 + x + y * 0.9, my - R - 10 + y * 0.6 - 30 + y, H(x < 0 ? '#6b8fff' : '#4a6fe0')); }
+      img.circle(mx + 6, my - 100, 6, H('#ffffff'));
+      // 별 모양 섬
+      const star5 = (cx, cy, r, c1, c2) => {
+        const pts = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5, rr = k % 2 ? r * 0.45 : r; pts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+        const inPoly = (x, y) => { let c = false; for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+        for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (inPoly(x + 0.5, y + 0.5)) img.set(cx + x, cy + y, H(x + y < -r * 0.2 ? c1 : c2));
+        img.glow(cx, cy, r * 2, H('#fff6c8'), 0.25);
+      };
+      for (let i = 0; i < 6; i++) star5(30 + rnd() * 420, 420 + rnd() * 380, 12 + Math.floor(rnd() * 12), '#fff3a0', '#ffd23f');
+      for (let k = 0; k < 40; k++) cloud(img, rnd, (k / 40) * BW * 1.1, 870 + rnd() * 30, 14 + Math.floor(rnd() * 6), ['#e8deff', '#c9b8ff', '#9f88e8']);
+      for (let i = 0; i < 30; i++) { const x = rnd() * BW, y = rnd() * 850; img.glow(x, y, 7, [255, 245, 200], 0.7); for (let k = -4; k <= 4; k++) { img.set(x + k, y, [255, 250, 220]); img.set(x, y + k, [255, 250, 220]); } }
+    },
+
+    xmas(img, rnd) {
+      gradient(img, ['#0b1538', '#13245a', '#1e3a7a', '#3a5aa8', '#6f8fd0']);
+      for (let y = 0; y < 300; y++) for (let x = 0; x < BW; x++) {
+        const band = Math.exp(-(((y - 130 - Math.sin(x / 60) * 50) / 35) ** 2)), v = Math.sin(x / 35 + y / 50) * 0.5 + 0.5;
+        if (band * v > 0.2) img.blend(x, y, H(v > 0.7 ? '#ff7bd5' : '#7dffb5'), 0.3 * band * v);
+      }
+      for (let i = 0; i < 200; i++) img.set(rnd() * BW, rnd() * 400, [240, 240, 255]);
+      for (let x = 0; x < BW; x++) {        // 눈 언덕 두 겹
+        const a = Math.round(640 + Math.sin(x / 70) * 30), b2 = Math.round(720 + Math.sin(x / 45 + 1) * 18);
+        for (let y = a; y < BH; y++) img.set(x, y, H(y < a + 3 ? '#ffffff' : '#c9daf0'));
+        for (let y = b2; y < BH; y++) img.set(x, y, H(y < b2 + 3 ? '#ffffff' : '#e6f0fa'));
+      }
+      const tree = (x, base, h) => {
+        for (let y = 0; y < h; y++) { const hw = (y / h) * h * 0.35 + 1; for (let xx = -hw; xx <= hw; xx++) img.set(x + xx, base - h + y, H((y % 14 > 11) ? '#ffffff' : xx < 0 ? '#2fae55' : '#1f7a3a')); }
+        for (let k = 0; k < h / 5; k++) { const y = base - h + 6 + rnd() * (h - 8), hw = ((y - base + h) / h) * h * 0.35; img.set(x + (rnd() * 2 - 1) * hw, y, H(['#ff3b3b', '#ffd23f', '#4dc3ff', '#ff7bd5'][k % 4])); }
+        img.rect(x - 2, base, 5, 6, H('#5a3418')); img.circle(x, base - h - 2, 3, H('#ffd23f'));
+      };
+      for (let i = 0; i < 8; i++) tree(rnd() * BW, 660 + rnd() * 80, 40 + rnd() * 50);
+      { // 산타 작업장
+        const x = 150 + rnd() * 120, y = 800;
+        img.rect(x, y - 60, 110, 60, H('#a8463a')); img.rect(x + 85, y - 60, 25, 60, H('#863428'));
+        for (let k = 0; k < 40; k++) img.line(x - 10 + k * 1.2, y - 60 - k, x + 120 - k * 1.2, y - 60 - k, H(k < 4 ? '#ffffff' : k % 8 < 2 ? '#ffffff' : '#5a2a2a'));
+        img.rect(x + 80, y - 115, 14, 30, H('#7a3a2a')); img.rect(x + 78, y - 118, 18, 5, H('#ffffff'));
+        img.rect(x + 45, y - 30, 20, 30, H('#4a2a12'));
+        for (const wx of [12, 72]) { img.rect(x + wx, y - 45, 18, 16, H('#ffd23f')); img.glow(x + wx + 9, y - 37, 20, H('#ffd23f'), 0.3); }
+        for (let k = 0; k < 14; k++) { img.circle(x + 4 + k * 8, y - 62 + (k % 2), 1, H(['#ff3b3b', '#7dff8a', '#ffd23f', '#4dc3ff'][k % 4])); }
+        img.rect(x - 30, y - 50, 4, 50, H('#ffffff')); for (let yy = 0; yy < 50; yy += 6) img.rect(x - 30, y - 50 + yy, 4, 3, H('#ff3b3b'));
+        img.rect(x - 34, y - 54, 12, 5, H('#e8e8f0'));
+      }
+      { // 눈사람
+        const x = 380 + rnd() * 60, y = 840;
+        img.circle(x, y, 16, ball('#ffffff', '#eef4fb', '#c9d8ec')); img.circle(x, y - 24, 11, ball('#ffffff', '#eef4fb', '#c9d8ec'));
+        img.set(x - 4, y - 26, [20, 20, 30]); img.set(x + 4, y - 26, [20, 20, 30]); img.rect(x, y - 23, 5, 2, H('#ff8a1f'));
+        img.rect(x - 10, y - 15, 20, 3, H('#e23a3a')); img.rect(x - 8, y - 40, 16, 6, H('#1b1d2a')); img.rect(x - 11, y - 35, 22, 2, H('#1b1d2a'));
+      }
+      for (let i = 0; i < 400; i++) img.set(rnd() * BW, rnd() * BH, [255, 255, 255]);
+    },
+  };
+
+  function makeBackground(theme) {
     const img = Img(BW, BH);
-    BG[zone](img, S.mulberry32(1234 + zone * 99));
+    BG[theme](img, S.mulberry32(1234 + S.THEME_KEYS.indexOf(theme) * 99));
     return img.done();
+  }
+  // 위·아래 가장자리 평균색(구역 경계를 부드럽게 잇는 데 사용)
+  function edgeColors(canvas) {
+    const g = canvas.getContext('2d');
+    const avg = (y0) => { const d = g.getImageData(0, y0, canvas.width, 6).data; let r = 0, gg = 0, b = 0; const n = d.length / 4; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; } return [r / n, gg / n, b / n].map(Math.round); };
+    return { top: avg(0), bottom: avg(canvas.height - 6) };
   }
 
   /* ================= Phaser 텍스처 등록 ================= */
@@ -688,9 +988,9 @@
     return key;
   }
 
-  function ensurePlatform(scene, zone, w, variant = 0) {
-    const key = `plat_${zone}_${w}_${variant}`;
-    addCanvasTex(scene, key, makePlatform(zone, w, variant));
+  function ensurePlatform(scene, theme, w, variant = 0) {
+    const key = `plat_${theme}_${w}_${variant}`;
+    addCanvasTex(scene, key, makePlatform(theme, w, variant));
     return key;
   }
 
@@ -703,9 +1003,24 @@
     if (!scene.anims.exists('bird_fly')) scene.anims.create({ key: 'bird_fly', frames: [{ key: 'bird', frame: 0 }, { key: 'bird', frame: 1 }], frameRate: 6, repeat: -1 });
     ['#ffb347', '#ff7f50', '#7fe0ff'].forEach((c, i) => addCanvasTex(scene, 'fish' + i, makeFish(c)));
     for (let i = 0; i < 3; i++) addCanvasTex(scene, 'cloud' + i, makeCloudSprite(50 + i));
-    for (let z = 0; z < S.ZONES.length; z++) addCanvasTex(scene, 'bg' + z, makeBackground(z));
+    addSheet(scene, 'butterfly0', makeButterfly('#ff6fa8'), 9, 7, 2);
+    addSheet(scene, 'butterfly1', makeButterfly('#ffb347'), 9, 7, 2);
+    addSheet(scene, 'butterfly2', makeButterfly('#6bb8ff'), 9, 7, 2);
+    for (let i = 0; i < 3; i++) if (!scene.anims.exists('flutter' + i)) scene.anims.create({ key: 'flutter' + i, frames: [{ key: 'butterfly' + i, frame: 0 }, { key: 'butterfly' + i, frame: 1 }], frameRate: 8, repeat: -1 });
+    addCanvasTex(scene, 'balloon', makeBalloon());
+    addCanvasTex(scene, 'sleigh', makeSleigh());
+    ['#ff4d6d', '#4dc3ff', '#7dd87d', '#ffd23f'].forEach((c, i) => addCanvasTex(scene, 'gum' + i, makeGumdrop(c)));
   }
 
+  // 배경은 필요할 때(가까워질 때) 하나씩 만든다 → 처음 로딩이 빠름
+  const edgeCache = {};
+  function ensureBg(scene, theme) {
+    const key = 'bg_' + theme;
+    if (!scene.textures.exists(key)) { const c = makeBackground(theme); edgeCache[theme] = edgeColors(c); scene.textures.addCanvas(key, c); }
+    return key;
+  }
+  const bgEdges = (theme) => edgeCache[theme];
+
   root.PIXEL = { FW, FH, PLAT_H, SURF, BG_SCALE: 2, SKIN_COUNT: S.SKIN_COUNT, BODY, ACC, ACC_NAME, skinInfo, charSheet, drawCharPreview,
-    makePlatform, makeBackground, makeGift, registerTextures, ensureSkin, ensurePlatform };
+    makePlatform, makeBackground, makeGift, registerTextures, ensureSkin, ensurePlatform, ensureBg, bgEdges };
 })(typeof self !== 'undefined' ? self : this);
