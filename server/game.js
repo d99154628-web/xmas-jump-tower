@@ -44,13 +44,13 @@ function newRecord(key, name, skin) {
   return {
     key, name, skin, sid: nextSid++, socketId: null, online: true,
     x: spawnX(), y: S.FLOOR_Y - 30, anim: 0, flip: 0, lastMoveAt: 0,
-    lapBest: 0, correct: 0, wrong: 0,
+    lapBest: 0, correct: 0, wrong: 0, lives: S.GAME.lives, bestY: S.FLOOR_Y - 30,
     pending: null, deck: null, deckVer: -1, served: new Set(), cycle: 0,
   };
 }
 
 function resetScores(r) {
-  r.lapBest = 0; r.correct = 0; r.wrong = 0;
+  r.lapBest = 0; r.correct = 0; r.wrong = 0; r.lives = S.GAME.lives; r.bestY = S.FLOOR_Y - 30;
   r.pending = null; r.deck = null; r.deckVer = -1; r.served.clear(); r.cycle = 0;
 }
 
@@ -76,6 +76,7 @@ function attach(_io) {
     socket.on('m', (arr) => onMove(socket, arr));
     socket.on('quiz:next', (_d, ack) => onQuizNext(socket, ack));
     socket.on('quiz:answer', (d, ack) => onQuizAnswer(socket, d, ack));
+    socket.on('life:use', (d, ack) => onLifeUse(socket, d, ack));
     socket.on('disconnect', () => onLeave(socket));
   });
 
@@ -111,7 +112,7 @@ function onJoin(socket, data, ack) {
   socket.to('players').emit('roster:add', [rec.sid, rec.name, rec.skin, Math.round(rec.x), Math.round(rec.y)]);
   ack({
     ok: true, key: rec.key,
-    you: { sid: rec.sid, x: rec.x, y: rec.y, lapBest: rec.lapBest, correct: rec.correct, score: scoreOf(rec) },
+    you: { sid: rec.sid, x: rec.x, y: rec.y, lives: rec.lives, lapBest: rec.lapBest, correct: rec.correct, score: scoreOf(rec) },
     state: publicState(),
     roster: [...players.values()].filter((r) => r !== rec).map((r) => [r.sid, r.name, r.skin, Math.round(r.x), Math.round(r.y), r.anim, r.flip]),
   });
@@ -130,6 +131,7 @@ function onMove(socket, arr) {
   // 위로는 물리적으로 가능한 속도까지만(간단한 치트 방지). 아래(추락·리스폰)는 자유.
   const maxRise = 1250 * dt / 1000 + 80;   // 스프링(1080px/s) 포함
   if (rec.y - y > maxRise) y = rec.y - maxRise;
+  if (y < rec.bestY) rec.bestY = y;
   rec.x = x; rec.y = y; rec.anim = (arr[2] | 0) & 3; rec.flip = arr[3] ? 1 : 0; rec.lastMoveAt = now;
   if (isRunning()) {
     const h = S.heightOf(y);
@@ -161,8 +163,23 @@ function onQuizAnswer(socket, d, ack) {
   if (!p || !d || d.id !== p.id) return ack({ ok: false });
   rec.pending = null;
   const correct = Number(d.choice) === p.answer;
-  if (isRunning()) { if (correct) rec.correct++; else rec.wrong++; }
-  ack({ ok: true, correct, answer: p.answer, score: scoreOf(rec), correctCount: rec.correct });
+  if (isRunning()) { if (correct) { rec.correct++; rec.lives = Math.min(S.GAME.lives, rec.lives + 1); } else rec.wrong++; }
+  ack({ ok: true, correct, answer: p.answer, score: scoreOf(rec), correctCount: rec.correct, lives: rec.lives });
+}
+
+// 추락 후 생명 1개를 써서 떨어지기 전 자리로 돌아가기. 자기가 올라가 본 높이까지만 허용(치트 방지)
+function onLifeUse(socket, d, ack) {
+  if (typeof ack !== 'function') return;
+  const rec = players.get(socket.id);
+  if (!rec || !d) return ack({ ok: false });
+  const x = Number(d.x), y = Number(d.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || y < rec.bestY - 60) return ack({ ok: false, lives: rec.lives });
+  const free = !isRunning();           // 연습 시간에는 생명이 줄지 않음
+  if (!free && rec.lives <= 0) return ack({ ok: false, lives: 0 });
+  if (!free) rec.lives--;
+  rec.x = S.clamp(x, 0, S.WORLD_W); rec.y = y; rec.lastMoveAt = Date.now();
+  dirty.add(rec);
+  ack({ ok: true, lives: rec.lives, free });
 }
 
 function onLeave(socket) {
@@ -215,7 +232,7 @@ function dashboard() {
     t: Date.now(),
     players: activeRecords().map((r) => ({
       sid: r.sid, name: r.name, skin: r.skin, online: r.online, x: Math.round(r.x), y: Math.round(r.y),
-      zone: S.zoneOf(r.y), h: S.heightOf(r.y), score: scoreOf(r), best: r.lapBest, correct: r.correct, wrong: r.wrong,
+      zone: S.zoneOf(r.y), h: S.heightOf(r.y), score: scoreOf(r), lives: r.lives, best: r.lapBest, correct: r.correct, wrong: r.wrong,
     })),
   };
 }

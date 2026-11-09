@@ -69,6 +69,8 @@
     energyPerCorrect: 30,
     pointsPerCorrect: 30,
     giftRespawnMs: 20000,
+    lives: 3,               // 생명(❤️) 개수 — 크게 떨어지면 1개 써서 원래 자리로, 퀴즈 정답이면 +1(최대)
+    bigFall: 900,           // 이 높이(px) 이상 바닥보다 위에서 떨어지면 '추락 장면'
   };
 
   function mulberry32(a) {

@@ -85,3 +85,9 @@ h1 { margin: 0 0 6px; font-size: 28px; color: var(--gold); text-shadow: 3px 3px 
 .corner button { font-size: 18px; background: var(--panel); color: #fff; border: 2px solid #fff4; border-radius: 8px; padding: 4px 8px; }
 .teacher-link { position: fixed; left: 8px; bottom: 8px; z-index: 50; font-size: 12px; background: #0009; color: #fff9; border: 1px solid #fff3; border-radius: 6px; padding: 4px 8px; }
 .teacher-link:hover { color: #fff; }
+
+/* 추락 장면: 위로 흐르는 속도선 */
+.fallfx { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden;
+  background: repeating-linear-gradient(90deg, transparent 0 46px, rgba(255,255,255,.55) 46px 48px, transparent 48px 110px, rgba(255,255,255,.3) 110px 111px, transparent 111px 160px);
+  background-size: 160px 300px; animation: speedlines .18s linear infinite; mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
+@keyframes speedlines { from { background-position: 0 0; } to { background-position: 0 -300px; } }

@@ -110,6 +110,13 @@ async function api(p, opts = {}, token) {
   const ja2 = await emitAck(a2, 'join', { name: '산타햄찌', skin: 3, key: 'testkey-aaaa1111' });
   ok(ja2.ok && ja2.you.sid === ja.you.sid && ja2.you.score === scoreBefore, '새로고침해도 같은 학생·점수 유지');
 
+  // 생명: 올라가 본 적 없는 높이로는 복귀 불가, 올라간 곳으로는 생명 1개 쓰고 복귀
+  const cheat = await emitAck(b, 'life:use', { x: 400, y: -50000 });
+  ok(!cheat.ok, '가 본 적 없는 높이로 복귀 불가');
+  for (let i = 0; i < 25; i++) { b.emit('m', [400, -100 - i * 60, 2, 0]); await sleep(70); }
+  b.emit('m', [400, -60, 3, 0]); await sleep(100);
+  const lu = await emitAck(b, 'life:use', { x: 400, y: -1500 });
+  ok(lu.ok && lu.lives === 2, `추락 후 생명 1개 쓰고 복귀 (남은 생명 ${lu.lives})`);
   let ended = null; b.on('game:end', (d) => (ended = d));
   await api('/game/stop', { method: 'POST' }, token);
   await sleep(300);

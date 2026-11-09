@@ -147,7 +147,10 @@
     go: (t) => tone(sfxBus, 'square', 1320, t, 0.35, 0.14),
     boing: (t) => { tone(sfxBus, 'triangle', 180, t, 0.35, 0.3, 720); tone(sfxBus, 'square', 360, t + 0.02, 0.18, 0.06, 1100); },
     land: (t) => noise(sfxBus, t, 0.08, 0.15, 'lowpass', 900),
-    pop: (t) => tone(sfxBus, 'triangle', 660, t, 0.08, 0.15, 990),
+    fall: (t) => { tone(sfxBus, 'square', 1400, t, 1.4, 0.1, 120); noise(sfxBus, t, 1.4, 0.35, 'bandpass', 3000, 300); },
+    thud: (t) => { tone(sfxBus, 'sine', 120, t, 0.45, 0.6, 40); noise(sfxBus, t, 0.3, 0.5, 'lowpass', 600); },
+    heal: (t) => [880, 1175, 1568, 2093].forEach((f, i) => tone(sfxBus, 'triangle', f, t + i * 0.06, 0.2, 0.12)),
+        pop: (t) => tone(sfxBus, 'triangle', 660, t, 0.08, 0.15, 990),
   };
 
   root.AUDIO = {

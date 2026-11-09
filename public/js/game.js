@@ -274,7 +274,8 @@
       this.player.play(this.skinKey + '_idle');
       this.myLabel = this.label(0, 0, profile.name, { ...LABEL, color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(12);
 
-      this.physics.add.collider(this.player, this.platforms);
+      // 추락 장면 중에는 맨 밑바닥에만 부딪힌다
+      this.physics.add.collider(this.player, this.platforms, null, (_pl, plat) => !this.waitLand || plat.isFloor === true);
       this.physics.add.overlap(this.player, this.gifts, (_p, g) => this.onGift(g));
       this.physics.add.overlap(this.player, this.springs, (_p, sp) => this.onSpring(sp));
       cam.startFollow(this.player, true, 1, 0.14, 0, 70);
@@ -292,7 +293,8 @@
 
       this.energy = 100; this.lapBest = Net.me.lapBest || 0; this.correct = Net.me.correct || 0;
       this.jumps = 0; this.coyote = -1e9; this.jumpBuf = -1e9; this.anim = 0;
-      this.lastGroundY = this.player.y; this.safeZone = 0; this.whooshed = false; this.respawning = false;
+      this.lastGroundY = this.player.y; this.lastGroundX = this.player.x; this.safeZone = 0; this.whooshed = false; this.respawning = false;
+      this.lives = Net.me.lives != null ? Net.me.lives : S.GAME.lives; this.fallSeq = false;
       this.quizOpen = false; this.lastQuizAt = this.time.now; this.lastQuizClose = -1e9;
       this.lastSend = 0; this.lastSent = null; this.lastSentAt = 0; this.hudAt = 0;
       this.lastCount = null; this.wasRunning = false;
@@ -329,6 +331,7 @@
         s.body.setOffset(0, PIXEL.SURF);
         const c = s.body.checkCollision;
         c.down = false; c.left = false; c.right = false;   // 아래에서 뚫고 올라가는 발판
+        if (p.kind === 'floor') s.isFloor = true;
         ch.plats.push(s);
       });
       for (const sp of Z.springs) ch.springs.push(this.springs.create(sp.x, sp.y - 14, 'spring', 0).setScale(2).refreshBody().setDepth(4));
@@ -419,7 +422,8 @@
       Quiz.hide();
       if (this.quizOpen) this.closeQuiz();
       $('result').classList.add('hidden');
-      this.energy = 100; this.lapBest = 0; this.correct = 0; this.treesSeen.clear();
+      this.energy = 100; this.lapBest = 0; this.correct = 0; this.lives = S.GAME.lives; this.treesSeen.clear();
+      if (this.fallSeq) this.endFall();
       this.gifts.getChildren().forEach((g) => g.setVisible(true));
       this.teleport(S.WORLD_W / 2 + (Math.random() - 0.5) * 360, S.FLOOR_Y - 30);
       this.lastQuizAt = this.time.now + Math.max(0, st.startedAt - Net.serverNow());
@@ -430,7 +434,7 @@
       if (this.fx) { Object.values(this.fx).forEach((list) => list.forEach((e) => { e.stop(); e.killAll(); })); this.zone = -1; }   // 다른 구역 눈·낙엽이 남지 않게
       this.player.setPosition(x, y);
       this.player.body.setVelocity(0, 0);
-      this.lastGroundY = y; this.whooshed = false; this.safeZone = S.zoneOf(y);
+      this.lastGroundY = y; this.lastGroundX = x; this.whooshed = false; this.safeZone = S.zoneOf(y);
       this.cameras.main.centerOn(x, y - 70);
       this.lastSent = null;
       if (this.chunks) this.updateZone(y);   // 순간이동한 곳의 구역을 바로 만든다
@@ -450,15 +454,16 @@
       const sNow = Net.serverNow();
       const countdown = st.phase === 'playing' && sNow < st.startedAt;
       const running = st.phase === 'playing' && !st.paused && !countdown;
-      const frozen = this.quizOpen || this.respawning || countdown || (st.phase === 'playing' && st.paused) || st.phase === 'ended';
+      const frozen = this.quizOpen || this.respawning || this.fallSeq || countdown || (st.phase === 'playing' && st.paused) || st.phase === 'ended';
       const p = this.player;
       const body = p.body;
       const k = this.keys;
       const onGround = body.blocked.down || body.touching.down;
 
+      if (this.waitLand && onGround && p.y > S.FLOOR_Y - 60) this.onFallLanded();
       if (onGround && !this.wasGround && this.prevVy > 380) { this.dust.explode(6, p.x, p.y + 28); if (this.prevVy > 700) AUDIO.sfx('land'); }
       this.wasGround = onGround; this.prevVy = body.velocity.y;
-      if (onGround) { this.coyote = time; this.jumps = 0; this.lastGroundY = p.y; this.safeZone = S.zoneOf(p.y); this.whooshed = false; }
+      if (onGround && !this.fallSeq) { this.coyote = time; this.jumps = 0; this.lastGroundY = p.y; this.lastGroundX = p.x; this.safeZone = S.zoneOf(p.y); this.whooshed = false; }
 
       if (frozen) {
         if (!this.quizOpen) body.setVelocityX(0);
@@ -487,17 +492,18 @@
       }
 
       // 크게 떨어지면 슈웅~ 소리 + 체크포인트로
-      if (!onGround && body.velocity.y > 0 && !this.respawning) {
+      if (!onGround && body.velocity.y > 0 && !this.respawning && !this.fallSeq) {
         const d = p.y - this.lastGroundY;
         if (d > 420 && !this.whooshed) { this.whooshed = true; AUDIO.sfx('whoosh'); this.cameras.main.shake(300, 0.004); }
-        if (d > 900) this.respawn(this.safeZone, '슈웅~ 이 구역 출발점으로 돌아가요!');
+        // 바닥보다 충분히 높은 곳에서 크게 떨어지면 → 맨 밑바닥까지 추락 장면 + 생명 1개로 복귀
+        if (d > 600 && S.FLOOR_Y - this.lastGroundY > S.GAME.bigFall) this.startFall();
       }
 
       if (running) {
         this.energy = Math.max(0, this.energy - S.GAME.energyDrain * (delta / 1000));
         const h = S.heightOf(p.y);
         if (h > this.lapBest) this.lapBest = h;
-        if (!this.quizOpen && time - this.lastQuizAt > S.GAME.quizEvery * 1000) this.openQuiz('time');
+        if (!this.quizOpen && !this.fallSeq && time - this.lastQuizAt > S.GAME.quizEvery * 1000) this.openQuiz('time');
       }
 
       const anim = !onGround ? (body.velocity.y < 0 ? 2 : 3) : Math.abs(body.velocity.x) > 10 ? 1 : 0;
@@ -555,6 +561,77 @@
       this.ensureChunks(z);
     }
 
+    /* ---------- 추락 장면 → 생명 1개로 원래 자리 복귀 ---------- */
+    startFall() {
+      const p = this.player;
+      this.fallSeq = true;
+      const back = { x: this.lastGroundX, y: this.lastGroundY };
+      const fromH = S.heightOf(back.y);
+      if (this.quizOpen) { Quiz.hide(); this.closeQuiz(); }
+      p.body.moves = false; p.body.setVelocity(0, 0);
+      p.play(this.skinKey + '_fall');
+      this.anim = 3;
+      AUDIO.sfx('fall');
+      $('fallfx').classList.remove('hidden');
+      center('으아아아~!', true);
+      // 1단계: 빙글빙글 돌며 빠르게 떨어진다(높이 숫자가 0까지 줄어듦)
+      this.tweens.add({ targets: p, angle: 1080, duration: 1500 });
+      this.tweens.add({ targets: p, y: p.y + 700, duration: 700, ease: 'Quad.in' });
+      const counter = { h: fromH };
+      this.fallCounter = this.tweens.add({ targets: counter, h: 0, duration: 1500, ease: 'Quad.in', onUpdate: () => { $('hudHeight').textContent = `📏 ${Math.round(counter.h)} m ↓↓↓`; } });
+      this.time.delayedCall(800, () => {
+        // 2단계: 맨 밑바닥 위 하늘로 순간이동해서 바닥까지 쾅
+        this.cameras.main.flash(200, 255, 255, 255);
+        this.teleport(p.x, S.FLOOR_Y - 700);
+        this.fallSeq = true;
+        p.body.moves = true; p.body.setVelocity(0, 900);
+        this.waitLand = true;
+      });
+      this.fallBack = back;
+    }
+
+    onFallLanded() {
+      const p = this.player;
+      this.waitLand = false;
+      this.tweens.killTweensOf(p); p.setAngle(0);
+      if (this.fallCounter) this.fallCounter.stop();
+      $('fallfx').classList.add('hidden');
+      this.cameras.main.shake(450, 0.02);
+      this.dust.explode(24, p.x, p.y + 28);
+      AUDIO.sfx('thud');
+      center('쿵!💫');
+      p.body.setVelocity(0, 0); p.body.moves = false;
+      this.time.delayedCall(900, () => {
+        const back = this.fallBack;
+        socket.timeout(4000).emit('life:use', { x: Math.round(back.x), y: Math.round(back.y) }, (err, res) => {
+          if (!err && res && res.ok) {
+            if (res.lives != null) this.lives = res.lives;
+            center(res.free ? '✨ 연습 시간이라 생명은 그대로!' : `💔 생명 1개 사용! (남은 생명 ${this.lives})`, true);
+            AUDIO.sfx('heal');
+            this.time.delayedCall(900, () => {
+              this.teleport(back.x, back.y - 2);
+              this.puff.explode(16, back.x, back.y);
+              this.cameras.main.flash(300, 255, 240, 200);
+              this.endFall();
+            });
+          } else {
+            if (res && res.lives != null) this.lives = res.lives;
+            center('🤍 생명이 없어요! 여기서 다시 올라가요 (퀴즈를 맞히면 생명 +1)', true);
+            this.time.delayedCall(1800, () => this.endFall());
+          }
+        });
+      });
+    }
+
+    endFall() {
+      this.fallSeq = false; this.waitLand = false;
+      this.tweens.killTweensOf(this.player); this.player.setAngle(0);
+      this.player.body.moves = true;
+      $('fallfx').classList.add('hidden');
+      center(null);
+      this.lastSent = null;
+    }
+
     // 10구역마다 트리 기념 지점 통과 축하
     checkTrees(p) {
       for (const ch of this.chunks.values()) {
@@ -571,6 +648,8 @@
       const st = Net.state;
       $('hudHeight').textContent = `📏 ${S.heightOf(this.player.y)} m · 최고 ${this.lapBest} m`;
       $('hudScore').textContent = `⭐ ${this.lapBest + this.correct * S.GAME.pointsPerCorrect}점`;
+      const hearts = '❤️'.repeat(Math.max(0, this.lives)) + '🤍'.repeat(Math.max(0, S.GAME.lives - this.lives));
+      if ($('hudLives').textContent !== hearts) $('hudLives').textContent = hearts;
       const fill = $('energyFill');
       fill.style.width = `${this.energy}%`;
       fill.classList.toggle('low', this.energy < 25);
@@ -601,7 +680,7 @@
     /* ---------- 스프링·배경 소품 ---------- */
     onSpring(sp) {
       const body = this.player.body;
-      if (this.quizOpen || this.respawning || body.velocity.y < -60 || this.time.now - (sp.lastBoing || 0) < 250) return;
+      if (this.quizOpen || this.respawning || this.fallSeq || body.velocity.y < -60 || this.time.now - (sp.lastBoing || 0) < 250) return;
       sp.lastBoing = this.time.now;
       body.setVelocityY(-S.PHYS.spring);
       this.jumps = 1; this.coyote = -1e9; this.whooshed = false;
@@ -613,7 +692,7 @@
 
     /* ---------- 퀴즈·선물·정상 ---------- */
     onGift(g) {
-      if (!g.visible) return;
+      if (!g.visible || this.fallSeq) return;
       const st = Net.state;
       const running = st.phase === 'playing' && !st.paused && Net.serverNow() >= st.startedAt;
       if (!running) {
@@ -647,6 +726,7 @@
           AUDIO.sfx('correct');
           this.energy = Math.min(100, this.energy + S.GAME.energyPerCorrect);
           this.correct = res.correctCount;
+          if (res.lives != null && res.lives > this.lives) { this.lives = res.lives; toast('❤️ 생명 +1!'); AUDIO.sfx('heal'); }
         } else AUDIO.sfx('wrong');
         setTimeout(() => { Quiz.hide(); if (this.quizOpen) this.closeQuiz(); }, res.correct ? 900 : 1800);   // 실제 시간 기준
       });

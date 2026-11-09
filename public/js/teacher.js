@@ -207,7 +207,7 @@
     sorted.forEach((p, i) => {
       const tr = document.createElement('tr');
       tr.className = (p.online ? '' : 'offline ') + (i < 3 ? 'top' + (i + 1) : '');
-      const cells = [i + 1, null, p.name, p.score, `${p.h}m (최고 ${p.best})`, p.zone + 1, `${p.correct} / ${p.wrong}`];
+      const cells = [i + 1, null, p.name, p.score, `${p.h}m (최고 ${p.best})`, p.zone + 1, '❤️'.repeat(Math.max(0, p.lives || 0)) || '🤍', `${p.correct} / ${p.wrong}`];
       cells.forEach((v, k) => {
         const td = document.createElement('td');
         if (k === 1) { const img = document.createElement('img'); img.src = avatar(p.skin); img.width = 24; img.style.imageRendering = 'pixelated'; td.append(img); }
