@@ -144,44 +144,50 @@
   tickTimer.n = 0;
 
   /* ---------- 미니맵 · 순위 ---------- */
-  function buildMapBase(seed) {
+  // 무한 타워: 학생들이 있는 구역 근처만 잘라서 보여 준다
+  function mapRange() {
+    const zs = players.filter((p) => p.online).map((p) => p.zone);
+    if (!zs.length) return [0, 5];
+    let z0 = Math.max(0, Math.min(...zs) - 1), z1 = Math.max(...zs) + 1;
+    if (z1 - z0 < 5) z1 = z0 + 5;
+    if (z1 - z0 > 12) z0 = z1 - 12;   // 너무 넓으면 선두 쪽 12구역
+    return [z0, z1];
+  }
+  function buildMapBase(seed, z0, z1) {
     const cv = $('map');
     const W = cv.width, H = cv.height;
     const base = document.createElement('canvas'); base.width = W; base.height = H;
     const g = base.getContext('2d');
-    const sx = W / S.WORLD_W, sy = H / S.WORLD_H;
-    const lvl = S.buildLevel(seed);
-    lvl.order.forEach((key, i) => {
-      const z = S.THEMES[key];
-      g.fillStyle = z.color;
-      g.fillRect(0, S.zoneTop(i) * sy, W, S.ZONE_H * sy + 1);
-      g.fillStyle = '#0006'; g.fillRect(0, S.zoneTop(i) * sy, W, S.ZONE_H * sy + 1);
-      g.fillStyle = '#ffffffdd'; g.font = '12px Galmuri11, sans-serif';
-      g.fillText(`${z.emoji} ${z.name}`, 6, (S.zoneTop(i) + S.ZONE_H) * sy - 6);
-    });
-    for (const p of lvl.platforms) {
-      g.fillStyle = p.kind === 'checkpoint' || p.kind === 'summit' ? '#ffd23f' : '#ffffff88';
-      g.fillRect(p.x * sx, p.y * sy, Math.max(2, p.w * sx), 2);
+    const yTop = S.zoneTop(z1), span = (z1 - z0 + 1) * S.ZONE_H;
+    const sx = W / S.WORLD_W, sy = H / span;
+    const Y = (y) => (y - yTop) * sy;
+    for (let z = z0; z <= z1; z++) {
+      g.fillStyle = S.themeOf(seed, z).color;
+      g.fillRect(0, Y(S.zoneTop(z)), W, S.ZONE_H * sy + 1);
+      g.fillStyle = '#0005'; g.fillRect(0, Y(S.zoneTop(z)), W, S.ZONE_H * sy + 1);
+      g.fillStyle = '#ffffffaa'; g.font = '11px Galmuri11, sans-serif';
+      g.fillText(`${S.heightOf(S.zoneBottom(z))}m`, 4, Y(S.zoneBottom(z)) - 4);
+      const Z = S.buildZone(seed, z);
+      for (const p of Z.platforms) { g.fillStyle = p.kind === 'checkpoint' || p.kind === 'floor' ? '#ffd23f' : '#ffffff88'; g.fillRect(p.x * sx, Y(p.y), Math.max(2, p.w * sx), 2); }
+      g.fillStyle = '#4dff88'; for (const sp of Z.springs) g.fillRect(sp.x * sx - 1, Y(sp.y) - 3, 3, 3);
+      g.fillStyle = '#e23a3a'; for (const gf of Z.gifts) g.fillRect(gf.x * sx - 1, Y(gf.y) - 2, 3, 3);
+      if (Z.tree) { g.font = '14px sans-serif'; g.fillText('🎄', Z.tree.x * sx - 7, Y(Z.tree.y)); }
     }
-    g.fillStyle = '#4dff88';
-    for (const sp of lvl.springs) g.fillRect(sp.x * sx - 1, sp.y * sy - 3, 3, 3);
-    g.fillStyle = '#e23a3a';
-    for (const gf of lvl.gifts) g.fillRect(gf.x * sx - 1, gf.y * sy - 2, 3, 3);
-    g.font = '16px sans-serif'; g.fillText('🎄', lvl.summit.x * sx - 8, lvl.summit.y * sy);
-    return base;
+    return { base, Y, sx };
   }
 
   function drawMap() {
     if (!state) return;
-    if (mapSeed !== state.seed) { mapBase = buildMapBase(state.seed); mapSeed = state.seed; }
+    const [z0, z1] = mapRange();
+    const key = `${state.seed}:${z0}:${z1}`;
+    if (mapSeed !== key) { mapBase = buildMapBase(state.seed, z0, z1); mapSeed = key; $('mapRange').textContent = `${S.heightOf(S.zoneBottom(z0))}~${S.heightOf(S.zoneTop(z1))}m`; }
     const cv = $('map'); const g = cv.getContext('2d');
     g.imageSmoothingEnabled = false;
-    g.drawImage(mapBase, 0, 0);
-    const sx = cv.width / S.WORLD_W, sy = cv.height / S.WORLD_H;
+    g.drawImage(mapBase.base, 0, 0);
     g.font = '10px Galmuri11, sans-serif'; g.textAlign = 'center';
     for (const p of players) {
       if (!p.online) continue;
-      const x = p.x * sx, y = p.y * sy;
+      const x = p.x * mapBase.sx, y = Math.max(12, Math.min(cv.height - 2, mapBase.Y(p.y)));
       g.drawImage(PIXEL.charSheet(p.skin), 0, 0, PIXEL.FW, PIXEL.FH, x - 9, y - 19, 18, 21);
       g.fillStyle = '#000a'; g.fillText(p.name, x + 1, y - 19);
       g.fillStyle = '#fff'; g.fillText(p.name, x, y - 20);
@@ -201,7 +207,7 @@
     sorted.forEach((p, i) => {
       const tr = document.createElement('tr');
       tr.className = (p.online ? '' : 'offline ') + (i < 3 ? 'top' + (i + 1) : '');
-      const cells = [i + 1, null, p.name, p.score, `${p.h}m (최고 ${p.best})`, p.laps, `${p.correct} / ${p.wrong}`];
+      const cells = [i + 1, null, p.name, p.score, `${p.h}m (최고 ${p.best})`, p.zone + 1, `${p.correct} / ${p.wrong}`];
       cells.forEach((v, k) => {
         const td = document.createElement('td');
         if (k === 1) { const img = document.createElement('img'); img.src = avatar(p.skin); img.width = 24; img.style.imageRendering = 'pixelated'; td.append(img); }

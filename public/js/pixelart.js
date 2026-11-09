@@ -313,7 +313,7 @@
   /* ================= 발판 (폭 w x 24, 윗면 y=8, 위 8줄은 장식) ================= */
   const PLAT_H = 24, SURF = 8;
   function makePlatform(theme, w, variant = 0) {
-    const zone = S.THEME_KEYS.indexOf(theme);
+    const zone = ['magma', 'water', 'flower', 'ground', 'candy', 'oz', 'sky', 'star', 'space', 'xmas'].indexOf(theme);
     const b = Buf(w, PLAT_H);
     const rnd = S.mulberry32(zone * 7919 + w * 31 + variant * 104729);
     const r = (a, c) => a + rnd() * (c - a);
@@ -953,10 +953,235 @@
     },
   };
 
-  function makeBackground(theme) {
+  /* ================= 상상 풍경 15종 × 시간대 4가지 ================= */
+  const PAL_SKY = {
+    day: ['#4aa3e8', '#6cb8ef', '#9fd3f6', '#d4ecfa'],
+    sunset: ['#2b1d5c', '#6a2f7a', '#c8507a', '#ff8a5a', '#ffc87a'],
+    night: ['#05081e', '#0c1440', '#18245e', '#24306e'],
+    pastel: ['#bfe0ff', '#d8d0ff', '#f8d4ec', '#fff0d8'],
+  };
+  function palAdj(pal) {
+    const tgt = { sunset: [255, 138, 90], night: [20, 26, 68], pastel: [255, 255, 255] }[pal];
+    const amt = { sunset: 0.22, night: 0.58, pastel: 0.35 }[pal] || 0;
+    const cache = new Map();
+    return (hex) => {
+      let v = cache.get(hex);
+      if (!v) { v = amt ? mixRgb(hexToRgb(hex), tgt, amt).map((c) => Math.round(pal === 'sunset' ? c * 0.92 : c)) : hexToRgb(hex); cache.set(hex, v); }
+      return v;
+    };
+  }
+  const tri = (img, cx, base, half, h, c1, c2) => { for (let y = 0; y < h; y++) { const hw = (y / h) * half; for (let x = -hw; x <= hw; x++) img.set(cx + x, base - h + y, x < 0 ? c1 : c2); } };
+  const layerHills = (img, base, amp, per, ph, col, col2) => { const tops = []; for (let x = 0; x < BW; x++) { const t = Math.round(base + Math.sin(x / per + ph) * amp + Math.sin(x / (per / 3.3) + ph * 2) * amp * 0.25); tops.push(t); for (let y = t; y < BH; y++) img.set(x, y, col2 && (x * 7 + y * 3) % 17 === 0 ? col2 : col); } return tops; };
+  const ballA = (A, hi, base, lo) => (nx, ny) => { const l = -(nx * 0.6 + ny * 0.8); return A(l > 0.45 ? hi : l > -0.35 ? base : lo); };
+
+  const ARCH = {
+    desert(img, rnd, A) {
+      for (let i = 0; i < 3; i++) { const cx = 60 + rnd() * 360, h = 90 + rnd() * 70; tri(img, cx, 640 + i * 10, h * 1.1, h, A('#f0d08a'), A('#c89a50')); for (let k = 0; k < h; k += 8) img.line(cx - (k / h) * h * 1.1, 640 + i * 10 - h + k, cx + (k / h) * h * 1.1, 640 + i * 10 - h + k, A('#d8b070')); }
+      layerHills(img, 660, 14, 70, 1, A('#e8c27a'));
+      layerHills(img, 730, 18, 55, 3, A('#d9a85a'), A('#c8904a'));
+      layerHills(img, 810, 12, 40, 5, A('#c8904a'), A('#b07838'));
+      for (let i = 0; i < 6; i++) {          // 선인장
+        const x = rnd() * BW, base = 760 + rnd() * 120, h = 30 + rnd() * 40, g = A('#3f9b3a'), g2 = A('#2e7d32');
+        img.rect(x - 3, base - h, 7, h, g); img.rect(x + 2, base - h, 2, h, g2);
+        img.rect(x - 11, base - h * 0.6, 8, 4, g); img.rect(x - 11, base - h * 0.6 - 12, 4, 12, g);
+        img.rect(x + 4, base - h * 0.45, 8, 4, g); img.rect(x + 8, base - h * 0.45 - 10, 4, 10, g2);
+      }
+      { const ox = 80 + rnd() * 300, oy = 790; img.circle(ox, oy, 14, A('#3fa8d8')); for (let k = 0; k < 2; k++) { const px = ox - 20 + k * 40; img.line(px, oy, px + 6, oy - 40, A('#8a5a2b')); for (let a = 0; a < 6; a++) img.line(px + 6, oy - 40, px + 6 + Math.cos(a) * 16, oy - 40 + Math.sin(a) * 7 + 4, A('#2e9e4f')); } }
+    },
+    jungle(img, rnd, A) {
+      for (let k = 0; k < 3; k++) layerHills(img, 520 + k * 110, 26, 30 + k * 10, k * 2, A(['#2f6e3a', '#28803c', '#1f6a30'][k]), A('#3f9b4a'));
+      { const wx = 120 + rnd() * 240; for (let y = 200; y < 820; y++) for (let x = -10; x <= 10; x++) img.set(wx + x + Math.sin(y / 30) * 2, y, A((x + y) % 7 < 2 ? '#e6f6ff' : '#7fd0f0')); img.glow(wx, 820, 40, A('#ffffff'), 0.6); }
+      for (let i = 0; i < 26; i++) { const x = rnd() * BW, y = 420 + rnd() * 460, r = 8 + rnd() * 14; img.circle(x, y, Math.round(r), ballA(A, '#6fcf5a', '#3f9b3a', '#24702a')); }
+      for (let i = 0; i < 14; i++) { const x0 = rnd() * BW, len = 100 + rnd() * 300; for (let y = 0; y < len; y++) { const x = x0 + Math.sin(y / 20 + i) * 4; img.set(x, y, A('#2e7d32')); if (y % 22 === 11) img.circle(x + 3, y, 3, A('#4caf50')); } }
+      for (let i = 0; i < 18; i++) { const x = rnd() * BW, y = 500 + rnd() * 380; img.circle(x, y, 3, A(['#ff4d6d', '#ffb347', '#ff7bd5'][i % 3])); img.set(x, y, A('#ffe066')); }
+      for (let i = 0; i < 4; i++) { const x = rnd() * BW, y = 300 + rnd() * 300; img.rect(x, y, 6, 4, A('#ff3b3b')); img.rect(x + 5, y - 2, 4, 3, A('#2fbfef')); img.set(x + 8, y - 2, [255, 210, 0]); img.rect(x - 4, y + 1, 4, 2, A('#ffd23f')); }
+    },
+    crystal(img, rnd, A) {
+      const wall = A('#1e1236');
+      for (let y = 0; y < BH; y++) { const wl = 50 + 30 * Math.sin(y / 70) + 10 * Math.sin(y / 17), wr = 50 + 30 * Math.sin(y / 61 + 1); for (let x = 0; x < wl; x++) img.set(x, y, wall); for (let x = BW - wr; x < BW; x++) img.set(x, y, wall); }
+      const cols = [['#c8ffff', '#5fd0e0', '#2a7a9a'], ['#ffd0ff', '#d070e0', '#7a2a8a'], ['#e0e0ff', '#8080ff', '#3a3aa0']];
+      for (let i = 0; i < 12; i++) {
+        const cx = rnd() * BW, base = 200 + rnd() * 700, c = cols[i % 3];
+        img.glow(cx, base - 30, 70, A(c[1]), 0.35);
+        for (let k = 0; k < 5; k++) { const h = 40 + rnd() * 70 - Math.abs(k - 2) * 12, bx = cx + (k - 2) * 14, lean = (k - 2) * 9; for (let y = 0; y < h; y++) { const hw = 8 * (1 - (y / h) ** 2); for (let x = -hw; x <= hw; x++) img.set(bx + x + lean * (y / h), base - y, A(x < -hw / 3 ? c[0] : x < hw / 3 ? c[1] : c[2])); } }
+      }
+      for (let i = 0; i < 160; i++) img.set(rnd() * BW, rnd() * BH, A('#ffffff'));
+    },
+    ice(img, rnd, A) {
+      for (let y = 600; y < BH; y++) for (let x = 0; x < BW; x++) img.set(x, y, A((x * 3 + y * 5) % 37 === 0 ? '#9fd8f0' : y < 604 ? '#e6f6ff' : '#3a8ac0'));
+      for (let i = 0; i < 6; i++) {
+        const cx = rnd() * BW, w = 50 + rnd() * 70, h = 60 + rnd() * 120, base = 610 + rnd() * 250;
+        for (let y = 0; y < h; y++) { const hw = w * (0.4 + 0.6 * (y / h)) * (0.8 + 0.2 * Math.sin(y / 9 + i)); for (let x = -hw; x <= hw; x++) img.set(cx + x, base - h + y, A(x < -hw / 3 ? '#ffffff' : x < hw / 2 ? '#d8f0ff' : '#9fc8e8')); }
+        for (let y = 0; y < h * 0.5; y++) { const hw = w * 0.9 * (1 - y / (h * 0.5)); for (let x = -hw; x <= hw; x++) img.blend(cx + x, base + y, A('#bfe8ff'), 0.4); }
+      }
+      for (let i = 0; i < 7; i++) { const x = rnd() * BW, y = 860 + rnd() * 20; img.rect(x, y - 10, 6, 10, A('#1b1d2a')); img.rect(x + 1, y - 8, 4, 7, A('#ffffff')); img.set(x + 2, y - 9, A('#ff9a3c')); }
+      for (let y = 0; y < 300; y++) for (let x = 0; x < BW; x += 1) { const band = Math.exp(-(((y - 140 - Math.sin(x / 50) * 40) / 30) ** 2)); if (band > 0.2) img.blend(x, y, A('#7dffb5'), 0.25 * band); }
+    },
+    mushroom(img, rnd, A) {
+      layerHills(img, 760, 14, 50, 1, A('#4a8a3a'), A('#5aa04a'));
+      const caps = ['#e53935', '#8e44ad', '#2e86de', '#f39c12', '#e84393'];
+      for (let i = 0; i < 11; i++) {
+        const x = rnd() * BW, base = 640 + rnd() * 240, h = 60 + rnd() * 200, r = 20 + rnd() * 30, c = caps[i % 5];
+        img.rect(x - 6, base - h, 12, h, A('#f3e6d0')); img.rect(x + 3, base - h, 3, h, A('#d6c4a8'));
+        for (let yy = 0; yy < r * 0.7; yy++) { const hw = r * Math.sqrt(1 - ((yy - r * 0.7) / (r * 0.7)) ** 2); for (let xx = -hw; xx <= hw; xx++) img.set(x + xx, base - h - r * 0.7 + yy, A(xx < -hw / 3 ? shadeHex(c, 1.25) : c)); }
+        for (let k = 0; k < 5; k++) img.circle(x - r * 0.6 + k * r * 0.3, base - h - r * 0.35 + (k % 2) * 5, 2 + (k % 2), A('#ffffff'));
+        img.glow(x, base - h, r * 1.5, A(c), 0.15);
+      }
+      for (let i = 0; i < 80; i++) img.glow(rnd() * BW, 300 + rnd() * 600, 3, A('#c8ff80'), 0.8);
+    },
+    city(img, rnd, A) {
+      for (let layer = 0; layer < 3; layer++) {
+        let x = -10;
+        while (x < BW) {
+          const w = 20 + rnd() * 40, h = 120 + rnd() * 260 - layer * 50, base = 700 + layer * 70, c = A(['#3a4a7a', '#2a3460', '#1c2244'][layer]);
+          img.rect(x, base - h, w, h + 200, c);
+          for (let wy = base - h + 6; wy < base; wy += 8) for (let wx = x + 4; wx < x + w - 4; wx += 7) if (rnd() < 0.55) img.rect(wx, wy, 3, 4, A(rnd() < 0.8 ? '#ffe28a' : '#7fd8ff'));
+          if (rnd() < 0.3) { img.rect(x + w / 2 - 1, base - h - 18, 2, 18, c); img.set(x + w / 2, base - h - 19, [255, 60, 60]); }
+          x += w + 2 + rnd() * 6;
+        }
+      }
+      for (let i = 0; i < 3; i++) { const x = rnd() * 400, y = 400 + rnd() * 200, c = ['#ff4dd2', '#4dffe0', '#ffe04d'][i]; img.rect(x, y, 40, 14, A('#101020')); for (let k = 0; k < 40; k++) { img.set(x + k, y, A(c)); img.set(x + k, y + 13, A(c)); } img.glow(x + 20, y + 7, 30, A(c), 0.25); }
+      for (let x = 0; x < BW; x++) for (let y = 860; y < BH; y++) img.set(x, y, A(y === 860 ? '#5a6a9a' : '#141830'));
+    },
+    beach(img, rnd, A) {
+      for (let y = 560; y < 800; y++) for (let x = 0; x < BW; x++) img.set(x, y, A((Math.sin(x / 7 + y) > 0.92) ? '#e6f6ff' : y < 600 ? '#2f8fd0' : '#3fb0e0'));
+      for (let y = 560; y < 800; y++) img.blend(360 + Math.sin(y) * 10, y, A('#fff6c8'), 0.6);
+      for (let x = 0; x < BW; x++) { const t = Math.round(800 + Math.sin(x / 30) * 5); for (let y = t; y < BH; y++) img.set(x, y, A(y < t + 3 ? '#fff0c8' : (x + y) % 19 === 0 ? '#e0b880' : '#f5d6a0')); }
+      for (let i = 0; i < 4; i++) { const px = 30 + rnd() * 420, base = 820 + rnd() * 50, h = 110 + rnd() * 60; for (let y = 0; y < h; y++) { const x = px + Math.sin(y / h * 1.4) * 18; img.rect(x, base - y, 5, 1, A(y % 6 < 2 ? '#8a5a2b' : '#a8723a')); } const tx = px + Math.sin(1.4) * 18 + 2, ty = base - h; for (let a = 0; a < 7; a++) { const ang = Math.PI + a * 0.5; for (let k = 0; k < 34; k++) img.rect(tx + Math.cos(ang) * k, ty + Math.sin(ang) * k * 0.5 + (k * k) / 70, 3, 2, A('#2e9e4f')); } img.circle(tx, ty + 4, 4, A('#6b3e1e')); }
+      { const sx = 100 + rnd() * 250, sy = 600; img.rect(sx, sy, 34, 6, A('#ffffff')); tri(img, sx + 16, sy, 12, 30, A('#ffffff'), A('#e0e8f0')); }
+      for (let i = 0; i < 3; i++) { const ux = rnd() * BW, uy = 830 + rnd() * 40; img.line(ux, uy, ux, uy - 30, A('#ffffff')); for (let k = -16; k <= 16; k++) for (let t = 0; t < 8 - Math.abs(k) / 3; t++) img.set(ux + k, uy - 30 - t, A(Math.floor((k + 16) / 6) % 2 ? '#ff4d6d' : '#ffffff')); }
+    },
+    castle(img, rnd, A) {
+      const rb = ['#ff6b6b', '#ffb347', '#ffe066', '#7dd87d', '#6bb8ff', '#b388ff'];
+      for (let i = 0; i < 6; i++) for (let a = Math.PI; a < 2 * Math.PI; a += 0.004) for (let t = 0; t < 6; t++) img.blend(240 + Math.cos(a) * (260 - i * 6 - t), 620 + Math.sin(a) * (260 - i * 6 - t), A(rb[i]), 0.35);
+      const cx = 160 + rnd() * 160, base = 640;
+      img.rect(cx - 60, base - 90, 120, 90, A('#f0e8ff')); img.rect(cx + 30, base - 90, 30, 90, A('#d8ccf0'));
+      for (const [dx, h] of [[-70, 150], [70, 150], [-25, 200], [25, 170]]) {
+        img.rect(cx + dx - 12, base - h, 24, h, A('#f4eeff')); img.rect(cx + dx + 6, base - h, 6, h, A('#d8ccf0'));
+        tri(img, cx + dx, base - h, 16, 34, A('#9a7ae0'), A('#7a5ac0'));
+        img.line(cx + dx, base - h - 34, cx + dx, base - h - 48, A('#888888')); img.rect(cx + dx + 1, base - h - 48, 10, 6, A('#ff6b6b'));
+        for (let wy = base - h + 20; wy < base - 20; wy += 30) img.rect(cx + dx - 3, wy, 6, 10, A('#ffe28a'));
+      }
+      img.rect(cx - 10, base - 34, 20, 34, A('#7a5a3a'));
+      for (let k = 0; k < 50; k++) cloud(img, rnd, (k / 50) * BW * 1.1, 650 + rnd() * 240, 16 + Math.floor(rnd() * 10), [A('#ffffff'), A('#f0f0ff'), A('#d0d4f0')].map(rgbToHex));
+      for (let i = 0; i < 6; i++) cloud(img, rnd, rnd() * BW, 80 + rnd() * 300, 10 + Math.floor(rnd() * 8), [A('#ffffff'), A('#f4f4ff'), A('#d8dcf2')].map(rgbToHex));
+    },
+    volcano(img, rnd, A) {
+      const cx = 160 + rnd() * 160;
+      for (let y = 300; y < BH; y++) { const hw = 30 + (y - 300) * 0.55; for (let x = -hw; x <= hw; x++) img.set(cx + x, y, A(x < -hw / 3 ? '#6a3a2a' : '#4a2418')); }
+      img.glow(cx, 300, 80, A('#ff6a00'), 0.6);
+      for (let k = 0; k < 4; k++) { let x = cx + (k - 1.5) * 12; for (let y = 300; y < 300 + 200 + k * 60; y++) { x += Math.sin(y / 13 + k) * 0.8; img.rect(x, y, 4, 1, A(y % 9 < 3 ? '#ffd23f' : '#ff6a00')); } }
+      for (let i = 0; i < 9; i++) cloud(img, rnd, cx - 60 + rnd() * 120, 120 + rnd() * 160, 14 + Math.floor(rnd() * 12), [A('#8a8a90'), A('#6a6a70'), A('#4a4a50')].map(rgbToHex));
+      for (let i = 0; i < 40; i++) img.circle(cx + (rnd() - 0.5) * 120, 100 + rnd() * 200, 2, A(rnd() < 0.5 ? '#ff9a3c' : '#ffd23f'));
+      layerHills(img, 780, 16, 45, 2, A('#3a2a24'), A('#2a1a14'));
+      for (let i = 0; i < 4; i++) { const dx = rnd() * BW, dy = 790; img.rect(dx, dy - 12, 22, 10, A('#3f7a3a')); img.rect(dx + 18, dy - 30, 5, 20, A('#3f7a3a')); img.rect(dx + 18, dy - 34, 10, 6, A('#3f7a3a')); img.rect(dx - 8, dy - 9, 10, 3, A('#3f7a3a')); img.rect(dx + 2, dy - 2, 3, 6, A('#2e5a2a')); img.rect(dx + 14, dy - 2, 3, 6, A('#2e5a2a')); }
+    },
+    haunted(img, rnd, A) {
+      layerHills(img, 700, 20, 60, 1, A('#3a2a5a'), A('#4a3a6a'));
+      layerHills(img, 790, 12, 40, 3, A('#2a1e40'));
+      for (let i = 0; i < 6; i++) { const x = rnd() * BW, base = 720 + rnd() * 140, h = 90 + rnd() * 90; for (let y = 0; y < h; y++) img.rect(x + Math.sin(y / 15) * 4, base - y, 6 - y / h * 4, 1, A('#1a1028')); for (let b = 0; b < 4; b++) { let bx = x, by = base - h * (0.5 + b * 0.12); const dir = b % 2 ? 1 : -1; for (let k = 0; k < 30; k++) { bx += dir; by -= 0.6 + Math.sin(k / 4); img.set(bx, by, A('#1a1028')); img.set(bx, by + 1, A('#1a1028')); } } }
+      for (let i = 0; i < 7; i++) { const x = rnd() * BW, y = 820 + rnd() * 60; img.circle(x, y, 9, ballA(A, '#ffb35c', '#f08a24', '#b85d10')); img.rect(x - 4, y - 3, 3, 3, A('#ffe066')); img.rect(x + 2, y - 3, 3, 3, A('#ffe066')); img.rect(x - 4, y + 3, 9, 2, A('#ffe066')); img.glow(x, y, 16, A('#ffb347'), 0.3); img.rect(x, y - 12, 2, 4, A('#3f7a3a')); }
+      for (let i = 0; i < 6; i++) { const x = rnd() * BW, y = 250 + rnd() * 400; img.circle(x, y, 10, A('#f4f4ff')); for (let k = -10; k <= 10; k++) for (let t = 0; t < 8 + Math.sin(k) * 3; t++) img.set(x + k, y + t, A('#f4f4ff')); img.rect(x - 5, y - 3, 3, 4, A('#2a2040')); img.rect(x + 3, y - 3, 3, 4, A('#2a2040')); img.set(x - 7, y + 2, A('#ffb0c8')); img.set(x + 7, y + 2, A('#ffb0c8')); }
+      for (let i = 0; i < 10; i++) { const bx = rnd() * BW, by = 80 + rnd() * 400, c = A('#1a1028'); img.rect(bx - 1, by, 3, 3, c); for (let k = 1; k < 7; k++) { img.set(bx - 1 - k, by - (k % 3 === 0 ? 1 : 0), c); img.set(bx + 1 + k, by - (k % 3 === 0 ? 1 : 0), c); } }
+    },
+    dino(img, rnd, A) {
+      for (let i = 0; i < 2; i++) { const cx = rnd() * BW, h = 130 + rnd() * 60; tri(img, cx, 640, h * 0.9, h, A('#8a6a5a'), A('#6a4a3a')); img.glow(cx, 640 - h, 30, A('#ff6a00'), 0.4); }
+      layerHills(img, 640, 16, 70, 0, A('#7aa04a'), A('#6a903a'));
+      layerHills(img, 740, 14, 50, 2, A('#5a8a3a'), A('#4a7a2a'));
+      for (let i = 0; i < 3; i++) {          // 목 긴 공룡
+        const x = 40 + rnd() * 380, base = 700 + i * 50, c = A(['#6aa0b0', '#8ab060', '#c08a5a'][i]), c2 = A('#2a3a2a');
+        img.circle(x, base - 24, 22, c); img.rect(x - 22, base - 24, 44, 14, c);
+        for (let k = 0; k < 50; k++) img.circle(x + 16 + k * 0.5, base - 30 - k * 1.1, 4, c);
+        img.circle(x + 42, base - 86, 6, c); img.set(x + 44, base - 88, c2);
+        for (let k = 0; k < 30; k++) img.circle(x - 20 - k * 0.9, base - 20 + k * 0.4, 3 - k / 15, c);
+        for (const lx of [-14, -4, 6, 14]) img.rect(x + lx, base - 8, 6, 14, c);
+      }
+      for (let i = 0; i < 14; i++) { const x = rnd() * BW, base = 760 + rnd() * 120; for (let a = 0; a < 7; a++) { const ang = -Math.PI / 2 + (a - 3) * 0.35; for (let k = 0; k < 26; k++) img.set(x + Math.cos(ang) * k, base + Math.sin(ang) * k + (k * k) / 60, A(a % 2 ? '#2e7d32' : '#43a047')); } }
+      for (let i = 0; i < 4; i++) { const x = rnd() * BW, y = 860; img.circle(x, y, 7, ballA(A, '#ffffff', '#f4ecd8', '#c8b898')); img.set(x - 2, y - 2, A('#7ab0e0')); img.set(x + 2, y + 1, A('#7ab0e0')); }
+    },
+    toy(img, rnd, A) {
+      const cols = ['#ff4d6d', '#4dc3ff', '#ffd23f', '#7dd87d', '#b388ff', '#ff9a3c'];
+      for (let i = 0; i < 26; i++) {
+        const s = 24 + Math.floor(rnd() * 22), x = rnd() * BW, y = 860 - (i % 5) * s - rnd() * 300, c = cols[i % 6];
+        img.rect(x, y, s, s, A(c)); img.rect(x, y, s, 3, A(shadeHex(c, 1.3))); img.rect(x + s - 3, y, 3, s, A(shadeHex(c, 0.75)));
+        img.rect(x + s / 2 - 5, y + s / 2 - 5, 10, 10, A('#ffffff')); img.rect(x + s / 2 - 2, y + s / 2 - 4, 4, 8, A(c));
+      }
+      for (let x = 0; x < BW; x++) for (let y = 870; y < BH; y++) img.set(x, y, A(((x >> 4) + (y >> 4)) % 2 ? '#e0c8a0' : '#c8a878'));
+      for (let x = 0; x < BW; x += 10) img.rect(x, 864, 6, 3, A('#8a5a2b')); for (let x = 0; x < BW; x++) img.set(x, 862, A('#888899'));
+      { const tx = 60 + rnd() * 300; img.rect(tx, 836, 40, 24, A('#e23a3a')); img.rect(tx + 30, 820, 12, 16, A('#e23a3a')); img.rect(tx + 4, 840, 10, 8, A('#ffe28a')); img.rect(tx + 48, 840, 34, 20, A('#4dc3ff')); img.rect(tx + 88, 840, 34, 20, A('#7dd87d')); for (const wx of [8, 30, 56, 74, 96, 114]) img.circle(tx + wx, 862, 5, A('#1b1d2a')); }
+      for (let i = 0; i < 5; i++) img.circle(rnd() * BW, 200 + rnd() * 500, 12, (nx, ny) => A(Math.floor((Math.atan2(ny, nx) + Math.PI) / (Math.PI / 3)) % 2 ? '#ffffff' : cols[i]));
+    },
+    balloon(img, rnd, A) {
+      const cols = ['#ff4d6d', '#4dc3ff', '#ffd23f', '#7dd87d', '#b388ff', '#ff9a3c'];
+      for (let i = 0; i < 8; i++) cloud(img, rnd, rnd() * BW, 60 + rnd() * 700, 12 + Math.floor(rnd() * 10), [A('#ffffff'), A('#f2f6ff'), A('#d4def0')].map(rgbToHex));
+      for (let i = 0; i < 9; i++) {
+        const x = 30 + rnd() * 420, y = 120 + rnd() * 680, r = 10 + rnd() * 18, c1 = cols[i % 6], c2 = cols[(i + 2) % 6];
+        img.circle(x, y, Math.round(r), (nx, ny) => { const st = Math.floor((nx + 1) * 3) % 2; const l = -(nx * 0.6 + ny * 0.8); return A(st ? (l > 0 ? shadeHex(c1, 1.3) : c1) : (l > 0 ? shadeHex(c2, 1.3) : c2)); });
+        img.line(x - r * 0.6, y + r * 0.8, x - 3, y + r + 10, A('#5a3a1a')); img.line(x + r * 0.6, y + r * 0.8, x + 3, y + r + 10, A('#5a3a1a'));
+        img.rect(x - 4, y + r + 10, 8, 6, A('#8a5a2b'));
+      }
+      for (let i = 0; i < 20; i++) { const x = rnd() * BW, y = 200 + rnd() * 650, c = cols[i % 6]; img.circle(x, y, 5, ballA(A, shadeHex(c, 1.4), c, shadeHex(c, 0.7))); for (let k = 0; k < 14; k++) img.set(x + Math.sin(k / 2), y + 6 + k, A('#ffffff')); }
+    },
+    music(img, rnd, A) {
+      for (let s = 0; s < 3; s++) for (let x = 0; x < BW; x++) { const y0 = 200 + s * 220 + Math.sin(x / 60 + s) * 30; for (let l = 0; l < 5; l++) img.blend(x, y0 + l * 8, A('#ffffff'), 0.35); }
+      for (let i = 0; i < 14; i++) {
+        const x = rnd() * BW, y = 150 + rnd() * 620, c = ['#ff7bd5', '#ffd23f', '#7fd8ff', '#b388ff'][i % 4];
+        img.circle(x, y, 6, A(c)); img.rect(x + 4, y - 30, 3, 30, A(c));
+        if (i % 2) { img.rect(x + 4, y - 30, 20, 4, A(c)); img.rect(x + 21, y - 30, 3, 26, A(c)); img.circle(x + 18, y - 4, 6, A(c)); }
+        else for (let k = 0; k < 10; k++) img.set(x + 7 + k * 0.7, y - 30 + k * 1.3, A(c));
+        img.glow(x, y, 16, A(c), 0.25);
+      }
+      for (let x = 0; x < BW; x++) for (let y = 800; y < BH; y++) { const k = Math.floor(x / 24); img.set(x, y, A(x % 24 === 0 ? '#555566' : '#fafaff')); }
+      for (let x = 0; x < BW; x += 24) { if ([1, 2, 4, 5, 6].includes((x / 24) % 7)) img.rect(x - 7, 800, 14, 56, A('#1b1d2a')); }
+    },
+    lantern(img, rnd, A) {
+      layerHills(img, 640, 24, 80, 1, A('#2a3a5a'));
+      for (let i = 0; i < 5; i++) {          // 기와집 실루엣
+        const x = 20 + i * 100 + rnd() * 30, base = 760, c = A('#1a2238');
+        img.rect(x, base - 30, 70, 30, c);
+        for (let k = 0; k < 16; k++) img.line(x - 12 + k * 0.6 - (k < 4 ? 4 - k : 0), base - 30 - k, x + 82 - k * 0.6 + (k < 4 ? 4 - k : 0), base - 30 - k, c);
+        img.rect(x + 10, base - 22, 10, 10, A('#ffcc66')); img.rect(x + 46, base - 22, 10, 10, A('#ffcc66'));
+      }
+      for (let y = 770; y < BH; y++) for (let x = 0; x < BW; x++) img.set(x, y, A((Math.sin(x / 9 + y / 3) > 0.9) ? '#4a5a8a' : '#1c2848'));
+      for (let i = 0; i < 34; i++) {
+        const x = rnd() * BW, y = 60 + rnd() * 680, s = 5 + rnd() * 5;
+        img.glow(x, y, s * 4, A('#ffb347'), 0.4);
+        img.rect(x - s / 2, y - s * 0.7, s, s * 1.4, A('#ffcc66')); img.rect(x - s / 2, y - s * 0.7, s, 2, A('#d9822b')); img.rect(x - s / 2, y + s * 0.7 - 2, s, 2, A('#d9822b'));
+        img.blend(x, 790 + (y / 10), A('#ffb347'), 0.5);
+      }
+    },
+  };
+
+  function paintLand(img, rnd, arch, pal) {
+    const A = palAdj(pal);
+    gradient(img, PAL_SKY[pal]);
+    if (pal === 'night') {
+      for (let i = 0; i < 320; i++) img.set(rnd() * BW, rnd() * 700, [230, 230, 255]);
+      const mx = 60 + rnd() * 360, my = 80 + rnd() * 150;
+      img.glow(mx, my, 60, [255, 248, 220], 0.4); img.circle(mx, my, 22, ball('#fffdf0', '#fff3c8', '#e6d49a'));
+    } else if (pal === 'sunset') {
+      img.glow(240, 520, 160, [255, 200, 120], 0.6); img.circle(240, 520, 46, ball('#fff3b0', '#ffc860', '#ff9040'));
+    } else {
+      const sx = 60 + rnd() * 360; img.glow(sx, 100, 70, [255, 246, 200], 0.55); img.circle(sx, 100, 22, ball('#fffbe0', '#fff3b0', '#ffe27a'));
+      for (let i = 0; i < 5; i++) cloud(img, rnd, rnd() * BW, 60 + rnd() * 260, 9 + Math.floor(rnd() * 8), pal === 'pastel' ? ['#ffffff', '#fff0f8', '#f0d8ec'] : ['#ffffff', '#eef5ff', '#cddff2']);
+    }
+    ARCH[arch](img, rnd, A);
+  }
+
+  // 색상 회전(색 변형 맵)
+  function hueCanvas(src, hue) {
+    if (!hue) return src;
+    const c = makeCanvas(src.width, src.height); const g = c.getContext('2d');
+    g.filter = `hue-rotate(${hue}deg) saturate(1.15)`;
+    g.drawImage(src, 0, 0);
+    return c;
+  }
+  function makeBackground(t) {   // t: SHARED.THEMES 의 항목
     const img = Img(BW, BH);
-    BG[theme](img, S.mulberry32(1234 + S.THEME_KEYS.indexOf(theme) * 99));
-    return img.done();
+    const rnd = S.mulberry32(1234 + S.THEME_KEYS.indexOf(t.id) * 99);
+    if (t.kind === 'land') paintLand(img, rnd, t.arch, t.pal);
+    else BG[t.base](img, rnd);
+    return hueCanvas(img.done(), t.hue);
   }
   // 위·아래 가장자리 평균색(구역 경계를 부드럽게 잇는 데 사용)
   function edgeColors(canvas) {
@@ -988,9 +1213,9 @@
     return key;
   }
 
-  function ensurePlatform(scene, theme, w, variant = 0) {
-    const key = `plat_${theme}_${w}_${variant}`;
-    addCanvasTex(scene, key, makePlatform(theme, w, variant));
+  function ensurePlatform(scene, t, w, variant = 0) {
+    const key = `plat_${t.plat}_${t.platHue}_${w}_${variant}`;
+    if (!scene.textures.exists(key)) addCanvasTex(scene, key, hueCanvas(makePlatform(t.plat, w, variant), t.platHue));
     return key;
   }
 
@@ -1014,12 +1239,12 @@
 
   // 배경은 필요할 때(가까워질 때) 하나씩 만든다 → 처음 로딩이 빠름
   const edgeCache = {};
-  function ensureBg(scene, theme) {
-    const key = 'bg_' + theme;
-    if (!scene.textures.exists(key)) { const c = makeBackground(theme); edgeCache[theme] = edgeColors(c); scene.textures.addCanvas(key, c); }
+  function ensureBg(scene, t) {
+    const key = 'bg_' + t.id;
+    if (!scene.textures.exists(key)) { const c = makeBackground(t); edgeCache[t.id] = edgeColors(c); scene.textures.addCanvas(key, c); }
     return key;
   }
-  const bgEdges = (theme) => edgeCache[theme];
+  const bgEdges = (t) => edgeCache[t.id];
 
   root.PIXEL = { FW, FH, PLAT_H, SURF, BG_SCALE: 2, SKIN_COUNT: S.SKIN_COUNT, BODY, ACC, ACC_NAME, skinInfo, charSheet, drawCharPreview,
     makePlatform, makeBackground, makeGift, registerTextures, ensureSkin, ensurePlatform, ensureBg, bgEdges };

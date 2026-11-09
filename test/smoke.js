@@ -63,11 +63,11 @@ async function api(p, opts = {}, token) {
   await sleep(400);
   ok(counts[counts.length - 1] === 2, '참여 인원 2명 방송');
 
-  for (let i = 0; i < 6; i++) { a.emit('m', [480 + i * 5, 8900 - i * 10, 1, 0]); await sleep(70); }
+  for (let i = 0; i < 6; i++) { a.emit('m', [480 + i * 5, -100 - i * 10, 1, 0]); await sleep(70); }
   await sleep(200);
   ok(snaps.some((s) => s[0] === ja.you.sid && s[1] === 505), '위치 스냅샷 동기화(B가 A 위치 수신)');
-  a.emit('m', [480, 100, 2, 0]); await sleep(120);
-  ok(snaps.filter((s) => s[0] === ja.you.sid).pop()[2] > 8000, '순간 상승(치트) 위치 제한');
+  a.emit('m', [480, -90000, 2, 0]); await sleep(120);
+  ok(snaps.filter((s) => s[0] === ja.you.sid).pop()[2] > -1000, '순간 상승(치트) 위치 제한');
 
   const q0 = await emitAck(a, 'quiz:next', {});
   ok(!q0.ok, '대기 중엔 퀴즈 안 나옴');

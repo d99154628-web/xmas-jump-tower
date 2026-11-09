@@ -30,7 +30,7 @@ let nextSid = 1;
 function newSeed() { return Math.floor(Math.random() * 2 ** 31) >>> 0; }
 const clampInt = (v, a, b, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(b, Math.max(a, n)) : d; };
 const spawnX = () => Math.round(S.WORLD_W / 2 + (Math.random() - 0.5) * 360);
-const scoreOf = (r) => r.laps * S.GAME.lapBonus + r.lapBest + r.correct * S.GAME.pointsPerCorrect;
+const scoreOf = (r) => r.lapBest + r.correct * S.GAME.pointsPerCorrect;   // 최고 높이(m) + 정답 점수
 
 function publicState() {
   return {
@@ -44,13 +44,13 @@ function newRecord(key, name, skin) {
   return {
     key, name, skin, sid: nextSid++, socketId: null, online: true,
     x: spawnX(), y: S.FLOOR_Y - 30, anim: 0, flip: 0, lastMoveAt: 0,
-    laps: 0, lapBest: 0, correct: 0, wrong: 0, lastSummit: 0,
+    lapBest: 0, correct: 0, wrong: 0,
     pending: null, deck: null, deckVer: -1, served: new Set(), cycle: 0,
   };
 }
 
 function resetScores(r) {
-  r.laps = 0; r.lapBest = 0; r.correct = 0; r.wrong = 0; r.lastSummit = 0;
+  r.lapBest = 0; r.correct = 0; r.wrong = 0;
   r.pending = null; r.deck = null; r.deckVer = -1; r.served.clear(); r.cycle = 0;
 }
 
@@ -76,7 +76,6 @@ function attach(_io) {
     socket.on('m', (arr) => onMove(socket, arr));
     socket.on('quiz:next', (_d, ack) => onQuizNext(socket, ack));
     socket.on('quiz:answer', (d, ack) => onQuizAnswer(socket, d, ack));
-    socket.on('summit', (_d, ack) => onSummit(socket, ack));
     socket.on('disconnect', () => onLeave(socket));
   });
 
@@ -112,7 +111,7 @@ function onJoin(socket, data, ack) {
   socket.to('players').emit('roster:add', [rec.sid, rec.name, rec.skin, Math.round(rec.x), Math.round(rec.y)]);
   ack({
     ok: true, key: rec.key,
-    you: { sid: rec.sid, x: rec.x, y: rec.y, laps: rec.laps, lapBest: rec.lapBest, correct: rec.correct, score: scoreOf(rec) },
+    you: { sid: rec.sid, x: rec.x, y: rec.y, lapBest: rec.lapBest, correct: rec.correct, score: scoreOf(rec) },
     state: publicState(),
     roster: [...players.values()].filter((r) => r !== rec).map((r) => [r.sid, r.name, r.skin, Math.round(r.x), Math.round(r.y), r.anim, r.flip]),
   });
@@ -125,7 +124,7 @@ function onMove(socket, arr) {
   let x = Number(arr[0]); let y = Number(arr[1]);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return;
   x = S.clamp(x, 0, S.WORLD_W);
-  y = S.clamp(y, 0, S.WORLD_H);
+  y = S.clamp(y, S.TOP_LIMIT, 0);
   const now = Date.now();
   const dt = Math.min(1000, Math.max(16, now - (rec.lastMoveAt || now)));
   // 위로는 물리적으로 가능한 속도까지만(간단한 치트 방지). 아래(추락·리스폰)는 자유.
@@ -166,18 +165,6 @@ function onQuizAnswer(socket, d, ack) {
   ack({ ok: true, correct, answer: p.answer, score: scoreOf(rec), correctCount: rec.correct });
 }
 
-function onSummit(socket, ack) {
-  if (typeof ack !== 'function') return;
-  const rec = players.get(socket.id);
-  if (!rec) return ack({ ok: false });
-  const now = Date.now();
-  // 정상 근처(맨 위 300px 안)에 있어야 인정
-  if (rec.y > 420 || now - rec.lastSummit < 5000) return ack({ ok: false });
-  rec.lastSummit = now;
-  if (isRunning()) { rec.laps++; rec.lapBest = 0; }
-  ack({ ok: true, laps: rec.laps, score: scoreOf(rec) });
-}
-
 function onLeave(socket) {
   const rec = players.get(socket.id);
   if (rec) {
@@ -213,12 +200,12 @@ function timerTick() {
 }
 
 function activeRecords() {
-  return [...records.values()].filter((r) => r.online || r.correct + r.wrong + r.lapBest + r.laps > 0);
+  return [...records.values()].filter((r) => r.online || r.correct + r.wrong + r.lapBest > 0);
 }
 
 function ranking() {
   return activeRecords()
-    .map((r) => ({ sid: r.sid, name: r.name, skin: r.skin, score: scoreOf(r), laps: r.laps, best: r.lapBest, correct: r.correct, wrong: r.wrong, online: r.online }))
+    .map((r) => ({ sid: r.sid, name: r.name, skin: r.skin, score: scoreOf(r), best: r.lapBest, correct: r.correct, wrong: r.wrong, online: r.online }))
     .sort((a, b) => b.score - a.score || b.correct - a.correct)
     .map((r, i) => ({ rank: i + 1, ...r }));
 }
@@ -228,7 +215,7 @@ function dashboard() {
     t: Date.now(),
     players: activeRecords().map((r) => ({
       sid: r.sid, name: r.name, skin: r.skin, online: r.online, x: Math.round(r.x), y: Math.round(r.y),
-      zone: S.zoneOf(r.y), h: S.heightOf(r.y), score: scoreOf(r), laps: r.laps, best: r.lapBest, correct: r.correct, wrong: r.wrong,
+      zone: S.zoneOf(r.y), h: S.heightOf(r.y), score: scoreOf(r), best: r.lapBest, correct: r.correct, wrong: r.wrong,
     })),
   };
 }
@@ -301,8 +288,8 @@ function emitTeacher(ev, data) { if (teacherNs) teacherNs.emit(ev, data); }
 
 function resultsCsv() {
   const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  const rows = [['순위', '닉네임', '점수', '정상 도착', '이번 최고 높이(m)', '정답', '오답', '접속']];
-  for (const r of ranking()) rows.push([r.rank, r.name, r.score, r.laps, r.best, r.correct, r.wrong, r.online ? 'O' : 'X']);
+  const rows = [['순위', '닉네임', '점수', '최고 높이(m)', '정답', '오답', '접속']];
+  for (const r of ranking()) rows.push([r.rank, r.name, r.score, r.best, r.correct, r.wrong, r.online ? 'O' : 'X']);
   return rows.map((row) => row.map(esc).join(',')).join('\r\n');
 }
 

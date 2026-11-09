@@ -196,7 +196,7 @@
     Net.state = { ...Net.state, phase: 'ended' };
     if (Net.scene) { Quiz.hide(); if (Net.scene.quizOpen) Net.scene.closeQuiz(); }
     const me = ranking.find((r) => r.sid === Net.mySid);
-    $('myRank').textContent = me ? `${me.name} 님은 ${me.rank}등! ⭐ ${me.score}점 · 정답 ${me.correct}개 · 정상 ${me.laps}번` : '';
+    $('myRank').textContent = me ? `${me.name} 님은 ${me.rank}등! ⭐ ${me.score}점 · 정답 ${me.correct}개 · 최고 ${me.best}m` : '';
     const ol = $('rankList');
     ol.innerHTML = '';
     for (const r of ranking.slice(0, 10)) {
@@ -227,17 +227,19 @@
   const SHOOT = { tex: 'p_shoot', o: { x: { min: 300, max: 1000 }, y: { min: -10, max: 160 }, speedX: -520, speedY: 260, rotate: 153, lifespan: 1100, scale: 2, alpha: { start: 1, end: 0 }, frequency: 1700 } };
   const FALL = (tex, tints, freq, extra) => ({ tex, o: { x: { min: 0, max: 1000 }, y: -10, speedY: { min: 30, max: 70 }, speedX: { min: -35, max: 15 }, lifespan: 12000, scale: { min: 2, max: 3 }, rotate: { start: 0, end: 360 }, tint: tints, frequency: freq, ...(extra || {}) } });
   const FX = {
-    magma: [{ tex: 'p_ember', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -90, max: -30 }, speedX: { min: -15, max: 15 }, lifespan: 6500, scale: { min: 2, max: 3 }, alpha: { start: 1, end: 0 }, frequency: 90 } }],
-    water: [{ tex: 'p_bubble', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -70, max: -25 }, speedX: { min: -8, max: 8 }, lifespan: 9000, scale: { min: 2, max: 3 }, frequency: 160 } },
+    embers: [{ tex: 'p_ember', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -90, max: -30 }, speedX: { min: -15, max: 15 }, lifespan: 6500, scale: { min: 2, max: 3 }, alpha: { start: 1, end: 0 }, frequency: 90 } }],
+    bubbles: [{ tex: 'p_bubble', o: { x: { min: 0, max: 960 }, y: 560, speedY: { min: -70, max: -25 }, speedX: { min: -8, max: 8 }, lifespan: 9000, scale: { min: 2, max: 3 }, frequency: 160 } },
       FALL('p_petal', [0xffffff], 420, { speedY: { min: 15, max: 35 } })],
-    flower: [FALL('p_petal', [0xffffff, 0xfff0a0, 0xd0e0ff], 110), TWINKLE([0xfff6a8], 400)],
-    ground: [FALL('p_leaf', [0xffffff], 170)],
-    candy: [FALL('p_conf', [0xff4d6d, 0x4dc3ff, 0xffd23f, 0x7dff8a, 0xb388ff, 0xffffff], 60)],
-    oz: [FALL('p_petal', [0xff6060, 0xff3030], 220), TWINKLE([0x7dffb5, 0xfff6a8], 160)],
-    sky: [SNOW],
-    star: [TWINKLE([0xffffff, 0xfff6a8, 0xffd0f0], 70), SHOOT],
+    petals: [FALL('p_petal', [0xffffff, 0xfff0a0, 0xd0e0ff], 110), TWINKLE([0xfff6a8], 400)],
+    leaves: [FALL('p_leaf', [0xffffff], 170)],
+    sprinkles: [FALL('p_conf', [0xff4d6d, 0x4dc3ff, 0xffd23f, 0x7dff8a, 0xb388ff, 0xffffff], 60)],
+    poppies: [FALL('p_petal', [0xff6060, 0xff3030], 220), TWINKLE([0x7dffb5, 0xfff6a8], 160)],
+    snow: [SNOW],
+    stars: [TWINKLE([0xffffff, 0xfff6a8, 0xffd0f0], 70), SHOOT],
     space: [TWINKLE([0xffffff, 0xfff6a8, 0xff8080, 0x80ff9a], 110), SHOOT],
     xmas: [{ ...SNOW, o: { ...SNOW.o, frequency: 25 } }, TWINKLE([0xffd23f, 0xff6060, 0x7dff8a], 160)],
+    dust: [{ tex: 'p_dust', o: { x: { min: 960, max: 1000 }, y: { min: 0, max: 540 }, speedX: { min: -160, max: -80 }, speedY: { min: -10, max: 10 }, lifespan: 9000, scale: { min: 1.5, max: 2.5 }, tint: [0xf0d8a0, 0xe0c080], alpha: 0.7, frequency: 70 } }],
+    fireflies: [{ tex: 'p_star', o: { x: { min: 0, max: 960 }, y: { min: 0, max: 540 }, speedX: { min: -15, max: 15 }, speedY: { min: -20, max: 5 }, lifespan: 3500, scale: { start: 2, end: 0.5 }, alpha: { start: 1, end: 0 }, tint: [0xd8ff80, 0xffe066, 0x80fff0], frequency: 120 } }],
   };
 
   class GameScene extends Phaser.Scene {
@@ -252,15 +254,15 @@
     create() {
       Net.scene = this;
       PIXEL.registerTextures(this);
-      this.physics.world.setBounds(0, 0, S.WORLD_W, S.WORLD_H);
+      this.physics.world.setBounds(0, S.TOP_LIMIT, S.WORLD_W, -S.TOP_LIMIT);   // 위로 무제한
       const cam = this.cameras.main;
-      cam.setBounds(0, 0, S.WORLD_W, S.WORLD_H).setRoundPixels(true);
-      this.bgImgs = {}; this.bands = {}; this.ambient = [];
+      cam.setBounds(0, S.TOP_LIMIT, S.WORLD_W, -S.TOP_LIMIT).setRoundPixels(true);
+      this.chunks = new Map(); this.bands = new Map(); this.treesSeen = new Set();
+      $('hudZone').classList.add('hidden');
 
       this.platforms = this.physics.add.staticGroup();
       this.gifts = this.physics.add.staticGroup();
       this.springs = this.physics.add.staticGroup();
-      this.decor = [];
 
       this.skinKey = PIXEL.ensureSkin(this, profile.skin);
       this.player = this.physics.add.sprite(Net.me.x, Net.me.y, this.skinKey, 0).setScale(2).setDepth(10);
@@ -269,7 +271,6 @@
       this.player.play(this.skinKey + '_idle');
       this.myLabel = this.label(0, 0, profile.name, { ...LABEL, color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(12);
 
-      this.buildLevel(Net.state.seed);
       this.physics.add.collider(this.player, this.platforms);
       this.physics.add.overlap(this.player, this.gifts, (_p, g) => this.onGift(g));
       this.physics.add.overlap(this.player, this.springs, (_p, sp) => this.onSpring(sp));
@@ -280,66 +281,123 @@
 
       this.fx = {};
       for (const [k, list] of Object.entries(FX)) this.fx[k] = list.map(({ tex, o }) => this.add.particles(0, 0, tex, { ...o, emitting: false }).setScrollFactor(0).setDepth(-5));
-      this.preloadBgs();
+      this.setSeed(Net.state.seed);
       this.puff = this.add.particles(0, 0, 'p_puff', { speed: { min: 40, max: 130 }, angle: { min: 30, max: 150 }, lifespan: 380, scale: { start: 3, end: 0 }, emitting: false }).setDepth(9);
       this.dust = this.add.particles(0, 0, 'p_dust', { speed: { min: 20, max: 70 }, angle: { min: 180, max: 360 }, lifespan: 300, scale: { start: 2, end: 0 }, gravityY: 200, emitting: false }).setDepth(9);
       this.conf = this.add.particles(0, 0, 'p_conf', { speed: { min: 200, max: 480 }, angle: { min: 220, max: 320 }, gravityY: 700, lifespan: 2200, scale: 3,
         tint: [0xff3b3b, 0xffd23f, 0x4dff88, 0x4dc3ff, 0xff7bd5], emitting: false }).setDepth(20);
 
-      this.energy = 100; this.laps = Net.me.laps || 0; this.lapBest = Net.me.lapBest || 0; this.correct = Net.me.correct || 0;
+      this.energy = 100; this.lapBest = Net.me.lapBest || 0; this.correct = Net.me.correct || 0;
       this.jumps = 0; this.coyote = -1e9; this.jumpBuf = -1e9; this.anim = 0;
       this.lastGroundY = this.player.y; this.safeZone = 0; this.whooshed = false; this.respawning = false;
       this.quizOpen = false; this.lastQuizAt = this.time.now; this.lastQuizClose = -1e9;
       this.lastSend = 0; this.lastSent = null; this.lastSentAt = 0; this.hudAt = 0;
-      this.zone = -1; this.lastCount = null; this.wasRunning = false; this.summitLock = false;
+      this.lastCount = null; this.wasRunning = false;
 
       for (const r of Net.remotes.values()) this.spawnRemote(r);
       if (Net.state.phase === 'playing' && Net.serverNow() < Net.state.startedAt) this.onRoundStart();
     }
 
-    buildLevel(seed) {
+    /* ---------- 무한 타워: 구역(청크) 단위로 만들고 지우기 ---------- */
+    setSeed(seed) {
+      for (const z of [...this.chunks.keys()]) this.unloadChunk(z);
       this.seed = seed;
-      this.level = S.buildLevel(seed);
-      this.decor.forEach((d) => d.destroy());
-      this.decor = [];
-      this.platforms.clear(true, true);
-      this.gifts.clear(true, true);
-      this.springs.clear(true, true);
-      if (this.summitOverlap) { this.summitOverlap.destroy(); this.summitZone.destroy(); }
-      Object.values(this.bgImgs).forEach((im) => im.destroy()); Object.values(this.bands).forEach((im) => im.destroy());
-      this.bgImgs = {}; this.bands = {};
-      this.ambient.forEach((o) => { this.tweens.killTweensOf(o); o.destroy(); }); this.ambient = [];
-      const order = this.level.order;
-      this.ensureBgAround(S.zoneOf(this.player.y));
-      this.addAmbient();
+      this.treesSeen.clear();
+      this.zone = -1;
+      this.updateZone(this.player.y);
+    }
 
-      this.level.platforms.forEach((p, i) => {
+    themeAt(z) { return S.themeOf(this.seed, z); }
+
+    ensureChunks(z) {
+      for (let zz = Math.max(0, z - 1); zz <= z + 2; zz++) if (!this.chunks.has(zz)) this.loadChunk(zz);
+      for (const zz of [...this.chunks.keys()]) if (zz < z - 2 || zz > z + 3) this.unloadChunk(zz);
+      for (const zz of this.chunks.keys()) if (zz > 0 && this.chunks.has(zz - 1) && !this.bands.has(zz)) this.addBand(zz);
+    }
+
+    loadChunk(z) {
+      const Z = S.buildZone(this.seed, z), t = Z.theme;
+      const ch = { theme: t, objs: [], plats: [], gifts: [], springs: [], ambient: [], tree: null };
+      ch.objs.push(this.add.image(0, S.zoneTop(z), PIXEL.ensureBg(this, t)).setOrigin(0).setScale(PIXEL.BG_SCALE).setDepth(-10));
+      Z.platforms.forEach((p, i) => {
         // 텍스처는 위 8px 장식 + 아래 16px 발판. 충돌은 발판 부분만
-        const s = this.platforms.create(p.x + p.w / 2, p.y - PIXEL.SURF + PIXEL.PLAT_H / 2, PIXEL.ensurePlatform(this, order[p.zone], p.w, i % 3));
+        const s = this.platforms.create(p.x + p.w / 2, p.y - PIXEL.SURF + PIXEL.PLAT_H / 2, PIXEL.ensurePlatform(this, t, p.w, i % 3));
         s.body.setSize(p.w, PIXEL.PLAT_H - PIXEL.SURF, false);
         s.body.setOffset(0, PIXEL.SURF);
         const c = s.body.checkCollision;
         c.down = false; c.left = false; c.right = false;   // 아래에서 뚫고 올라가는 발판
-        if (p.kind === 'checkpoint') {
-          const z = S.THEMES[order[p.zone]];
-          this.decor.push(this.label(p.x + p.w / 2, p.y - 78, `${z.emoji} ${z.name} · ${z.season}`, { ...LABEL, fontSize: '15px', color: '#fff6a8' }).setOrigin(0.5, 1).setDepth(3));
-        }
+        ch.plats.push(s);
       });
-      for (const sp of this.level.springs) {
-        const s = this.springs.create(sp.x, sp.y - 14, 'spring', 0).setScale(2).refreshBody();
-        s.setDepth(4);
+      for (const sp of Z.springs) ch.springs.push(this.springs.create(sp.x, sp.y - 14, 'spring', 0).setScale(2).refreshBody().setDepth(4));
+      for (const g of Z.gifts) {
+        const s = this.gifts.create(g.x, g.y - 6, 'gift').setScale(2).refreshBody().setDepth(4);
+        this.tweens.add({ targets: s, y: s.y - 4, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        ch.gifts.push(s);
       }
-      for (const g of this.level.gifts) {
-        const s = this.gifts.create(g.x, g.y - 6, 'gift').setScale(2).refreshBody();
-        s.setDepth(4);
-        this.decor.push(this.tweens.add({ targets: s, y: s.y - 4, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' }));
+      if (Z.tree) {   // 10구역마다 크리스마스 트리 기념 지점
+        ch.objs.push(this.add.image(Z.tree.x, Z.tree.y, 'tree').setOrigin(0.5, 1).setScale(2).setDepth(3));
+        ch.objs.push(this.label(Z.tree.x, Z.tree.y - 104, `🎄 ${S.heightOf(Z.tree.y - 30)}m`, { ...LABEL, fontSize: '16px', color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(3));
+        ch.tree = Z.tree;
       }
-      const sm = this.level.summit;
-      this.decor.push(this.add.image(sm.x, sm.y, 'tree').setOrigin(0.5, 1).setScale(2).setDepth(3));
-      this.decor.push(this.label(sm.x, sm.y - 110, '🎄 GOAL!', { ...LABEL, fontSize: '18px', color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(3));
-      this.summitZone = this.add.zone(sm.x, sm.y - 45, 170, 90);
-      this.physics.add.existing(this.summitZone, true);
-      this.summitOverlap = this.physics.add.overlap(this.player, this.summitZone, () => this.onSummit());
+      this.addAmbient(ch, z);
+      this.chunks.set(z, ch);
+    }
+
+    unloadChunk(z) {
+      const ch = this.chunks.get(z);
+      if (!ch) return;
+      for (const o of ch.ambient.concat(ch.gifts)) this.tweens.killTweensOf(o);
+      ch.objs.concat(ch.ambient).forEach((o) => o.destroy());
+      ch.plats.forEach((o) => this.platforms.remove(o, true, true));
+      ch.gifts.forEach((o) => this.gifts.remove(o, true, true));
+      ch.springs.forEach((o) => this.springs.remove(o, true, true));
+      for (const k of [z, z + 1]) { const b = this.bands.get(k); if (b) { b.destroy(); this.bands.delete(k); } }
+      this.chunks.delete(z);
+      // 더 이상 안 쓰는 배경 그림은 메모리에서 지운다(맵 100개라도 가볍게)
+      const id = ch.theme.id;
+      if (![...this.chunks.values()].some((c) => c.theme.id === id) && this.textures.exists('bg_' + id)) this.textures.remove('bg_' + id);
+      const platKeys = this.textures.getTextureKeys().filter((k) => k.startsWith('plat_'));
+      if (platKeys.length > 240) {
+        const used = new Set([...this.chunks.values()].map((c) => `plat_${c.theme.plat}_${c.theme.platHue}_`));
+        for (const k of platKeys) if (![...used].some((u) => k.startsWith(u))) this.textures.remove(k);
+      }
+    }
+
+    // 구역 경계: 아래·위 배경 색을 섞어 부드럽게
+    addBand(k) {
+      const lower = PIXEL.bgEdges(this.chunks.get(k - 1).theme), upper = PIXEL.bgEdges(this.chunks.get(k).theme);
+      if (!lower || !upper) return;
+      const key = `band_${this.chunks.get(k).theme.id}_${this.chunks.get(k - 1).theme.id}`;
+      if (!this.textures.exists(key)) {
+        const c = document.createElement('canvas'); c.width = 4; c.height = 160;
+        const g = c.getContext('2d');
+        for (let y = 0; y < 160; y++) {
+          const t = y / 159, a = Math.sin(Math.PI * t) * 0.92;
+          const col = upper.bottom.map((v, i) => Math.round(v + (lower.top[i] - v) * t));
+          g.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; g.fillRect(0, y, 4, 1);
+        }
+        this.textures.addCanvas(key, c).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
+      this.bands.set(k, this.add.image(0, S.zoneBottom(k) - 80, key).setOrigin(0).setDisplaySize(S.WORLD_W, 160).setDepth(-9.5));
+    }
+
+    addAmbient(ch, z) {
+      const amb = ch.theme.amb;
+      if (!amb) return;
+      const rnd = S.mulberry32(4242 + z * 7 + this.seed);
+      const top = S.zoneTop(z);
+      const Y = (a, b) => top + S.ZONE_H * (a + rnd() * (b - a));
+      const keep = (o) => { ch.ambient.push(o); return o; };
+      const swim = (obj, dist, dur) => this.tweens.add({ targets: obj, x: obj.x + dist, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+        onYoyo: () => obj.toggleFlipX(), onRepeat: () => obj.toggleFlipX() });
+      const bob = (obj, dy, dur) => this.tweens.add({ targets: obj, y: obj.y + dy, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      if (amb === 'fish') for (let i = 0; i < 10; i++) { const f = keep(this.add.image(60 + rnd() * 400, Y(0.08, 0.9), 'fish' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.9)); swim(f, 300 + rnd() * 300, 7000 + rnd() * 7000); bob(f, 10, 1400 + rnd() * 800); }
+      if (amb === 'birds') for (let i = 0; i < 6; i++) { const b = keep(this.add.sprite(40 + rnd() * 300, Y(0.08, 0.6), 'bird').setScale(2).setDepth(-9).play('bird_fly')); swim(b, 400 + rnd() * 200, 9000 + rnd() * 6000); }
+      if (amb === 'clouds' || amb === 'sleigh') for (let i = 0; i < (amb === 'clouds' ? 8 : 4); i++) { const c = keep(this.add.image(rnd() * 960, Y(0.05, 0.85), 'cloud' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.85)); swim(c, 160 + rnd() * 200, 18000 + rnd() * 14000); }
+      if (amb === 'butterflies') for (let i = 0; i < 9; i++) { const b = keep(this.add.sprite(40 + rnd() * 600, Y(0.1, 0.9), 'butterfly' + (i % 3)).setScale(2).setDepth(-9).play('flutter' + (i % 3))); swim(b, 150 + rnd() * 250, 5000 + rnd() * 4000); bob(b, 30, 900 + rnd() * 600); }
+      if (amb === 'gums') for (let i = 0; i < 10; i++) { const g = keep(this.add.image(30 + rnd() * 900, Y(0.05, 0.9), 'gum' + (i % 4)).setScale(2.5).setDepth(-9)); bob(g, 24, 1800 + rnd() * 1500); this.tweens.add({ targets: g, angle: 20, duration: 2000 + rnd() * 1000, yoyo: true, repeat: -1 }); }
+      if (amb === 'balloon') for (let i = 0; i < 2; i++) { const b = keep(this.add.image(100 + rnd() * 300, Y(0.15, 0.6), 'balloon').setScale(3).setDepth(-9)); swim(b, 350 + rnd() * 150, 20000 + rnd() * 8000); bob(b, 40, 3000); }
+      if (amb === 'sleigh') { const sl = keep(this.add.image(-120, Y(0.12, 0.3), 'sleigh').setScale(2.5).setDepth(-9).setFlipX(true)); this.tweens.add({ targets: sl, x: 1100, duration: 14000, repeat: -1, repeatDelay: 4000 }); bob(sl, 20, 1200); }
     }
 
     spawnRemote(r) {
@@ -354,11 +412,11 @@
     /* ---------- 라운드·이동 ---------- */
     onRoundStart() {
       const st = Net.state;
-      if (st.seed !== this.seed) this.buildLevel(st.seed);
+      if (st.seed !== this.seed) this.setSeed(st.seed);
       Quiz.hide();
       if (this.quizOpen) this.closeQuiz();
       $('result').classList.add('hidden');
-      this.energy = 100; this.laps = 0; this.lapBest = 0; this.correct = 0;
+      this.energy = 100; this.lapBest = 0; this.correct = 0; this.treesSeen.clear();
       this.gifts.getChildren().forEach((g) => g.setVisible(true));
       this.teleport(S.WORLD_W / 2 + (Math.random() - 0.5) * 360, S.FLOOR_Y - 30);
       this.lastQuizAt = this.time.now + Math.max(0, st.startedAt - Net.serverNow());
@@ -372,10 +430,11 @@
       this.lastGroundY = y; this.whooshed = false; this.safeZone = S.zoneOf(y);
       this.cameras.main.centerOn(x, y - 70);
       this.lastSent = null;
+      if (this.chunks) this.updateZone(y);   // 순간이동한 곳의 구역을 바로 만든다
     }
 
     respawn(zone, msg) {
-      const cp = this.level.checkpoints[zone] || this.level.checkpoints[0];
+      const cp = S.buildZone(this.seed, zone).checkpoint;
       this.respawning = true;
       this.teleport(cp.x, cp.y - 30);
       this.cameras.main.flash(250, 255, 255, 255);
@@ -446,6 +505,7 @@
       this.sendPosition(time, anim);
       this.renderRemotes(sNow);
       this.updateZone(p.y);
+      this.checkTrees(p);
       if (time - this.hudAt > 120) { this.hudAt = time; this.updateHud(sNow, countdown, running); }
     }
 
@@ -486,20 +546,28 @@
     updateZone(y) {
       const z = S.zoneOf(y);
       if (z === this.zone) return;
-      const order = this.level.order;
-      if (this.zone >= 0) this.fx[order[this.zone]].forEach((e) => e.stop());
-      this.fx[order[z]].forEach((e) => e.start());
-      if (this.zone >= 0) { const Z = S.THEMES[order[z]]; toast(`${Z.emoji} ${Z.name} — ${Z.season}`); }
+      if (this.zone >= 0) this.fx[this.themeAt(this.zone).fx].forEach((e) => e.stop());
+      this.fx[this.themeAt(z).fx].forEach((e) => e.start());
       this.zone = z;
-      this.ensureBgAround(z);
+      this.ensureChunks(z);
+    }
+
+    // 10구역마다 트리 기념 지점 통과 축하
+    checkTrees(p) {
+      for (const ch of this.chunks.values()) {
+        const t = ch.tree;
+        if (!t || this.treesSeen.has(t.n) || Math.abs(p.x - t.x) > 160 || Math.abs(p.y - (t.y - 30)) > 90) continue;
+        this.treesSeen.add(t.n);
+        this.conf.explode(70, t.x, t.y - 60);
+        AUDIO.sfx('summit');
+        toast(`🎄 ${S.heightOf(t.y - 30)}m 돌파! 계속 올라가요!`, 2500);
+      }
     }
 
     updateHud(sNow, countdown, running) {
       const st = Net.state;
-      const Z = S.THEMES[this.level.order[this.zone < 0 ? 0 : this.zone]];
-      $('hudZone').textContent = `${Z.emoji} ${Z.name}`;
       $('hudHeight').textContent = `📏 ${S.heightOf(this.player.y)} m · 최고 ${this.lapBest} m`;
-      $('hudScore').textContent = `⭐ ${this.laps * S.GAME.lapBonus + this.lapBest + this.correct * S.GAME.pointsPerCorrect}점`;
+      $('hudScore').textContent = `⭐ ${this.lapBest + this.correct * S.GAME.pointsPerCorrect}점`;
       const fill = $('energyFill');
       fill.style.width = `${this.energy}%`;
       fill.classList.toggle('low', this.energy < 25);
@@ -538,85 +606,6 @@
       this.tweens.add({ targets: sp, scaleX: 2.3, scaleY: 1.7, duration: 70, yoyo: true, onComplete: () => { sp.setFrame(0); sp.setScale(2); } });
       this.puff.explode(10, sp.x, sp.y - 6);
       AUDIO.sfx('boing');
-    }
-
-    // 배경: 지금 구역과 위아래 구역만 만들어 붙이고, 경계는 색을 섞어 부드럽게
-    ensureBgAround(z) {
-      const order = this.level.order;
-      for (let zz = Math.max(0, z - 1); zz <= Math.min(S.ZONE_COUNT - 1, z + 1); zz++) {
-        if (this.bgImgs[zz]) continue;
-        const key = PIXEL.ensureBg(this, order[zz]);
-        this.bgImgs[zz] = this.add.image(0, S.zoneTop(zz), key).setOrigin(0).setScale(PIXEL.BG_SCALE).setDepth(-10);
-      }
-      for (let k = 1; k < S.ZONE_COUNT; k++) {
-        if (this.bands[k] || !this.bgImgs[k - 1] || !this.bgImgs[k]) continue;
-        const lower = PIXEL.bgEdges(order[k - 1]), upper = PIXEL.bgEdges(order[k]);
-        if (!lower || !upper) continue;
-        const key = `band_${order[k]}_${order[k - 1]}`;
-        if (!this.textures.exists(key)) {
-          const c = document.createElement('canvas'); c.width = 4; c.height = 160;
-          const g = c.getContext('2d');
-          for (let y = 0; y < 160; y++) {
-            const t = y / 159, a = Math.sin(Math.PI * t) * 0.92;
-            const col = upper.bottom.map((v, i) => Math.round(v + (lower.top[i] - v) * t));
-            g.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; g.fillRect(0, y, 4, 1);
-          }
-          this.textures.addCanvas(key, c).setFilter(Phaser.Textures.FilterMode.LINEAR);
-        }
-        const yb = S.WORLD_H - k * S.ZONE_H;
-        this.bands[k] = this.add.image(0, yb - 80, key).setOrigin(0).setDisplaySize(S.WORLD_W, 160).setDepth(-9.5);
-      }
-    }
-
-    // 나머지 배경은 쉬는 틈에 하나씩 미리 만들어 둔다(올라갈 때 끊김 방지)
-    preloadBgs() {
-      const todo = S.THEME_KEYS.slice();
-      const step = () => {
-        const k = todo.shift();
-        if (!k) return;
-        PIXEL.ensureBg(this, k);
-        setTimeout(step, 350);
-      };
-      setTimeout(step, 1200);
-    }
-
-    addAmbient() {
-      const order = this.level.order;
-      const rnd = S.mulberry32(4242 + this.seed);
-      const zoneY = (theme, a, b) => { const z = order.indexOf(theme); return S.zoneTop(z) + S.ZONE_H * (a + rnd() * (b - a)); };
-      const keep = (o) => { this.ambient.push(o); return o; };
-      const swim = (obj, dist, dur) => this.tweens.add({ targets: obj, x: obj.x + dist, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut',
-        onYoyo: () => obj.toggleFlipX(), onRepeat: () => obj.toggleFlipX() });
-      const bob = (obj, dy, dur) => this.tweens.add({ targets: obj, y: obj.y + dy, duration: dur, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-      for (let i = 0; i < 10; i++) {           // 바닷속: 물고기
-        const f = keep(this.add.image(60 + rnd() * 400, zoneY('water', 0.08, 0.9), 'fish' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.9));
-        swim(f, 300 + rnd() * 300, 7000 + rnd() * 7000); bob(f, 10, 1400 + rnd() * 800);
-      }
-      for (let i = 0; i < 6; i++) {            // 단풍 마을: 새
-        const b = keep(this.add.sprite(40 + rnd() * 300, zoneY('ground', 0.08, 0.6), 'bird').setScale(2).setDepth(-9).play('bird_fly'));
-        swim(b, 400 + rnd() * 200, 9000 + rnd() * 6000);
-      }
-      for (let i = 0; i < 9; i++) {            // 겨울 하늘·산타 마을: 구름
-        const c = keep(this.add.image(rnd() * 960, zoneY(i < 6 ? 'sky' : 'xmas', 0.05, i < 6 ? 0.85 : 0.4), 'cloud' + (i % 3)).setScale(2).setDepth(-9).setAlpha(0.85));
-        swim(c, 160 + rnd() * 200, 18000 + rnd() * 14000);
-      }
-      for (let i = 0; i < 9; i++) {            // 꽃나라: 나비
-        const b = keep(this.add.sprite(40 + rnd() * 600, zoneY('flower', 0.1, 0.9), 'butterfly' + (i % 3)).setScale(2).setDepth(-9).play('flutter' + (i % 3)));
-        swim(b, 150 + rnd() * 250, 5000 + rnd() * 4000); bob(b, 30, 900 + rnd() * 600);
-      }
-      for (let i = 0; i < 10; i++) {           // 과자나라: 둥실 젤리
-        const g = keep(this.add.image(30 + rnd() * 900, zoneY('candy', 0.05, 0.9), 'gum' + (i % 4)).setScale(2.5).setDepth(-9).setAlpha(0.95));
-        bob(g, 24, 1800 + rnd() * 1500); this.tweens.add({ targets: g, angle: 20, duration: 2000 + rnd() * 1000, yoyo: true, repeat: -1 });
-      }
-      for (let i = 0; i < 2; i++) {            // 오즈: 마법사 열기구
-        const b = keep(this.add.image(100 + rnd() * 300, zoneY('oz', 0.15, 0.6), 'balloon').setScale(3).setDepth(-9));
-        swim(b, 350 + rnd() * 150, 20000 + rnd() * 8000); bob(b, 40, 3000);
-      }
-      { // 산타 마을: 하늘을 가로지르는 썰매
-        const sl = keep(this.add.image(-120, zoneY('xmas', 0.12, 0.3), 'sleigh').setScale(2.5).setDepth(-9).setFlipX(true));
-        this.tweens.add({ targets: sl, x: 1100, duration: 14000, repeat: -1, repeatDelay: 4000 });
-        bob(sl, 20, 1200);
-      }
     }
 
     /* ---------- 퀴즈·선물·정상 ---------- */
@@ -667,25 +656,6 @@
       this.lastQuizClose = this.time.now;
     }
 
-    onSummit() {
-      if (this.summitLock || this.respawning) return;
-      this.summitLock = true;
-      const sm = this.level.summit;
-      this.conf.explode(70, sm.x, sm.y - 60);
-      AUDIO.sfx('summit');
-      this.sendPosition(this.time.now, this.anim, true);   // 서버가 정상 위치를 먼저 받도록
-      socket.timeout(4000).emit('summit', {}, (err, res) => {
-        const st = Net.state;
-        if (!err && res && res.ok && st.phase === 'playing') {
-          this.laps = res.laps; this.lapBest = 0;
-          toast(`🎄 정상 도착! +${S.GAME.lapBonus}점 · 처음부터 다시 도전!`, 2500);
-        } else toast('🎄 정상 도착! 메리 크리스마스!', 2500);
-      });
-      setTimeout(() => {
-        this.teleport(S.WORLD_W / 2 + (Math.random() - 0.5) * 300, S.FLOOR_Y - 30);
-        this.summitLock = false;
-      }, 1700);
-    }
   }
 
   if (new URLSearchParams(location.search).has('debug')) window.__jt = { Net, Quiz };   // 개발 점검용
