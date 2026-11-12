@@ -270,7 +270,7 @@
       this.skinKey = PIXEL.ensureSkin(this, profile.skin);
       this.player = this.physics.add.sprite(Net.me.x, Net.me.y, this.skinKey, 0).setScale(2).setDepth(10);
       this.player.body.setSize(14, 20).setOffset(5, 8);
-      this.player.setCollideWorldBounds(true).setMaxVelocity(600, 950);
+      this.player.setMaxVelocity(600, 950);   // 좌우 끝은 막지 않고 반대편으로 나온다(wrap)
       this.player.play(this.skinKey + '_idle');
       this.myLabel = this.label(0, 0, profile.name, { ...LABEL, color: '#ffd23f' }).setOrigin(0.5, 1).setDepth(12);
 
@@ -508,6 +508,8 @@
 
       const anim = !onGround ? (body.velocity.y < 0 ? 2 : 3) : Math.abs(body.velocity.x) > 10 ? 1 : 0;
       if (anim !== this.anim) { this.anim = anim; p.play(this.skinKey + ANIMS[anim]); }
+      // 화면 왼쪽 끝으로 나가면 오른쪽에서, 오른쪽 끝으로 나가면 왼쪽에서 나온다
+      if (p.x < 0 || p.x > S.WORLD_W) { p.setPosition(p.x < 0 ? p.x + S.WORLD_W : p.x - S.WORLD_W, p.y); body.updateFromGameObject(); this.lastSent = null; }
       if (body.velocity.x < 0) p.setFlipX(true); else if (body.velocity.x > 0) p.setFlipX(false);
       this.myLabel.setPosition(p.x, p.y - 32);
 
